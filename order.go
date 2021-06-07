@@ -1,13 +1,13 @@
 package orderbook
 
 import (
-	decimal "orderbook/pkg/decimal"
+	"orderbook/pkg/decimal"
 )
 
-const (
-	TypeLimit = iota
-	TypeMarket
-)
+// const (
+// 	TypeLimit = iota
+// 	TypeMarket
+// )
 
 const (
 	SideBuy = iota
@@ -15,10 +15,7 @@ const (
 )
 
 type Order struct {
-	Type     int
-	Symbol   string
-	Side     int
-	Quantity decimal.Decimal
-	Price    decimal.Decimal
-	ID       string
-}
+	Side     int             //  4 bytes
+	Quantity decimal.Decimal //  8 bytes
+	ID       string          // 16 bytes
+} //            Total: at least 28 bytes
