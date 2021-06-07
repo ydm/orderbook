@@ -77,6 +77,14 @@ func NewFromString(s string) (Decimal, error) {
 	return Decimal(x), nil
 }
 
+func NewFromStringPanic(s string) Decimal {
+	x, err := NewFromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return x
+}
+
 func (d Decimal) Integer() int64 {
 	return int64(d) / FractionalDenominator
 }
