@@ -9,9 +9,16 @@ const (
 	TypeMarket
 )
 
+const (
+	SideBuy = iota
+	SideSell
+)
+
 type Order struct {
-	Type   int
-	Symbol string
-	ID     string
-	Price  decimal.Decimal
+	Type     int
+	Symbol   string
+	Side     int
+	Quantity decimal.Decimal
+	Price    decimal.Decimal
+	ID       string
 }
