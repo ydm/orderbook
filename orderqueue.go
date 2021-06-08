@@ -95,6 +95,10 @@ func (q *OrderQueue) RemoveByID(orderID string) bool {
 	return false
 }
 
+func (q *OrderQueue) Iter() []*Order {
+	return q.queue
+}
+
 func (q *OrderQueue) Len() int {
 	// Len() also makes sure both of our data structures have the
 	// same length.
