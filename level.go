@@ -1,8 +1,6 @@
 package orderbook
 
-import (
-	"orderbook/pkg/decimal"
-)
+import "github.com/shopspring/decimal"
 
 // +-------+
 // | Level |
@@ -30,19 +28,19 @@ func NewLevel(price decimal.Decimal, levelType int) *Level {
 	}
 }
 
-func (v *Level) Key() int64 {
+func (v *Level) Key() decimal.Decimal {
 	switch v.Type {
 	case Ask:
-		return v.Price.Raw()
+		return v.Price
 	case Bid:
-		return -v.Price.Raw()
+		return v.Price.Neg()
 	default:
 		panic("illegal type")
 	}
 }
 
 func (v *Level) Less(rhs *Level) bool {
-	return v.Key() < rhs.Key()
+	return v.Key().LessThan(rhs.Key())
 }
 
 // +-----------+
@@ -94,4 +92,8 @@ func (h *LevelHeap) Walk(f func(level *Level) bool) {
 // +----------+
 
 // LevelMap maps Price to Level.
-type LevelMap map[decimal.Decimal]*Level
+type LevelMap map[int64]*Level
+
+func levelMapKey(d decimal.Decimal) int64 {
+	return d.Mul(decimal.NewFromInt(1_0000_0000)).IntPart()
+}

@@ -1,8 +1,6 @@
 package orderbook
 
-import (
-	"orderbook/pkg/decimal"
-)
+import "github.com/shopspring/decimal"
 
 const (
 	TypeLimit = iota

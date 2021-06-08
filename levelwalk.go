@@ -3,11 +3,13 @@ package orderbook
 import (
 	"container/heap"
 	"fmt"
+
+	"github.com/shopspring/decimal"
 )
 
 type Item struct {
 	index    int
-	priority int64
+	priority decimal.Decimal
 }
 
 func (i *Item) String() string {
@@ -24,7 +26,7 @@ func NewPriorityQueue(n int) PriorityQueue {
 func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
-	return pq[i].priority < pq[j].priority
+	return pq[i].priority.LessThan(pq[j].priority)
 }
 
 func (pq PriorityQueue) Swap(i, j int) {

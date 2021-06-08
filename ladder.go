@@ -3,7 +3,7 @@ package orderbook
 import (
 	"container/heap"
 
-	"orderbook/pkg/decimal"
+	"github.com/shopspring/decimal"
 )
 
 // Ladder keeps all price levels and their respective orders, allows
@@ -24,7 +24,7 @@ func NewLadder(ladderType int) Ladder {
 
 func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 	// First check if this level exists.
-	level, ok := d.mapping[price]
+	level, ok := d.mapping[levelMapKey(price)]
 	if ok {
 		// Add the order to this existing level.
 		return level.Orders.Add(o)
@@ -37,7 +37,7 @@ func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 	}
 
 	// Save the newly made level into our heap and mapping.
-	d.mapping[price] = level
+	d.mapping[levelMapKey(price)] = level
 	heap.Push(&d.heap, level)
 
 	return true
@@ -45,7 +45,7 @@ func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 
 func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 	// Check if this level exists.
-	level, ok := d.mapping[price]
+	level, ok := d.mapping[levelMapKey(price)]
 	if ok {
 		// Remove the order by its ID.
 		ans := level.Orders.RemoveByID(ID)
@@ -53,7 +53,7 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 		// If at this point the level is empty, remove it from
 		// this Ladder.
 		if level.Orders.Len() <= 0 {
-			delete(d.mapping, price)
+			delete(d.mapping, levelMapKey(price))
 			if heap.Remove(&d.heap, level.index) == nil {
 				panic("illegal state")
 			}
