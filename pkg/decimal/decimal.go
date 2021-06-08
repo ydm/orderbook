@@ -86,23 +86,27 @@ func NewFromStringPanic(s string) Decimal {
 }
 
 func (d Decimal) Integer() int64 {
-	return int64(d) / FractionalDenominator
+	return d.Raw() / FractionalDenominator
 }
 
 func (d Decimal) Fractional() int64 {
-	return int64(d) % FractionalDenominator
+	return d.Raw() % FractionalDenominator
+}
+
+func (d Decimal) Raw() int64 {
+	return int64(d)
 }
 
 func (d Decimal) Add(rhs Decimal) Decimal {
-	return Decimal(int64(d) + int64(rhs))
+	return Decimal(d.Raw() + rhs.Raw())
 }
 
 func (d Decimal) LessThan(rhs Decimal) bool {
-	return int64(d) < int64(rhs)
+	return d.Raw() < rhs.Raw()
 }
 
 func (d Decimal) Equal(rhs Decimal) bool {
-	return int64(d) == int64(rhs)
+	return d.Raw() == rhs.Raw()
 }
 
 func (d Decimal) LessThanEqual(rhs Decimal) bool {
