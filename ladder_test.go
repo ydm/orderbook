@@ -65,9 +65,8 @@ func TestLadder_RemoveOrder(t *testing.T) {
 	})
 }
 
-func TestLadder_MatchOrder_1(t *testing.T) {
+func TestLadder_MatchOrderLimit_1(t *testing.T) {
 	d := NewLadder(Ask)
-
 	f := func(present bool, price int64) int {
 		t.Helper()
 
@@ -93,7 +92,7 @@ func TestLadder_MatchOrder_1(t *testing.T) {
 		t.Errorf("have %d, want 3", have)
 	}
 
-	left := d.MatchOrder(decimal.NewFromInt(10), NewOrder("id6", decimal.NewFromInt(3)))
+	left := d.MatchOrderLimit(decimal.NewFromInt(10), NewOrder("id6", decimal.NewFromInt(3)))
 	if !left.IsZero() {
 		t.Errorf("have %v, want 0", left)
 	}
@@ -103,9 +102,8 @@ func TestLadder_MatchOrder_1(t *testing.T) {
 	}
 }
 
-func TestLadder_MatchOrder_2(t *testing.T) {
+func TestLadder_MatchOrderLimit_2(t *testing.T) {
 	d := NewLadder(Ask)
-
 	f := func(present bool, price int64) int {
 		t.Helper()
 
@@ -131,7 +129,7 @@ func TestLadder_MatchOrder_2(t *testing.T) {
 		t.Errorf("have %d, want 3", have)
 	}
 
-	left := d.MatchOrder(decimal.NewFromInt(10), NewOrder("id6", decimal.NewFromInt(10)))
+	left := d.MatchOrderLimit(decimal.NewFromInt(10), NewOrder("id6", decimal.NewFromInt(10)))
 	if !left.Equal(decimal.NewFromInt(4)) {
 		t.Errorf("have %v, want 4", left)
 	}
@@ -141,9 +139,8 @@ func TestLadder_MatchOrder_2(t *testing.T) {
 	}
 }
 
-func TestLadder_MatchOrder_3(t *testing.T) {
+func TestLadder_MatchOrderLimit_3(t *testing.T) {
 	d := NewLadder(Ask)
-
 	f := func(present bool, price int64) int {
 		t.Helper()
 
@@ -169,7 +166,7 @@ func TestLadder_MatchOrder_3(t *testing.T) {
 		t.Errorf("have %d, want 3", have)
 	}
 
-	left := d.MatchOrder(decimal.NewFromInt(10), NewOrder("id6", decimal.NewFromInt(2)))
+	left := d.MatchOrderLimit(decimal.NewFromInt(10), NewOrder("id6", decimal.NewFromInt(2)))
 	if !left.Equal(decimal.Zero) {
 		t.Errorf("have %v, want 0", left)
 	}
@@ -177,5 +174,38 @@ func TestLadder_MatchOrder_3(t *testing.T) {
 
 	if have := f(true, 10); have != 2 {
 		t.Errorf("have %d, want 2", have)
+	}
+}
+
+func TestLadder_MatchOrderMarket_1(t *testing.T) {
+	d := NewLadder(Ask)
+	f := func(present bool, price int64) int {
+		t.Helper()
+
+		dec := decimal.NewFromInt(price)
+		key := levelMapKey(dec)
+		level, ok := d.mapping[key]
+		if ok != present {
+			t.Errorf("have %t, want %t", ok, present)
+		}
+		if ok {
+			return level.Orders.Len()
+		}
+		return 0
+	}
+
+	d.AddOrder(decimal.NewFromInt(9), NewOrder("id1", decimal.NewFromInt(10)))
+	d.AddOrder(decimal.NewFromInt(10), NewOrder("id2", decimal.NewFromInt(1)))
+	d.AddOrder(decimal.NewFromInt(10), NewOrder("id3", decimal.NewFromInt(2)))
+	d.AddOrder(decimal.NewFromInt(10), NewOrder("id4", decimal.NewFromInt(3)))
+	d.AddOrder(decimal.NewFromInt(11), NewOrder("id5", decimal.NewFromInt(10)))
+
+	left := d.MatchOrderMarket(NewOrder("id6", decimal.NewFromInt(20)))
+	if !left.Equal(decimal.Zero) {
+		t.Errorf("have %v, want 0", left)
+	}
+
+	if f(false, 9) != 0 || f(false, 10) != 0 || f(true, 11) != 1 {
+		t.Error()
 	}
 }
