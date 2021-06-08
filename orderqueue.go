@@ -127,10 +127,11 @@ func (q *OrderQueue) Len() int {
 
 func (q *OrderQueue) String() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "    [OrderQueue\n")
-	for _, order := range q.queue {
-		fmt.Fprintf(&b, "      %v\n", order)
+	for i, order := range q.queue {
+		if i > 0 {
+			fmt.Fprintf(&b, "\n")
+		}
+		fmt.Fprintf(&b, "    %v", order)
 	}
-	fmt.Fprintf(&b, "]")
 	return b.String()
 }
