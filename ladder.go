@@ -64,13 +64,35 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 	return false
 }
 
-// func (d *Ladder) MatchOrder(price decimal.Decimal, quantity decimal.Decimal) (Order, bool) {
-// 	level, ok := d.mapping[price]
-// 	if ok {
-// 		for _, order := range level.Orders {
-// 		}
-// 	}
-// }
+// MatchOrder tries to match the given quantity at the given price.
+// Returns the quantity unmatched.
+func (d *Ladder) MatchOrder(price decimal.Decimal, quantity decimal.Decimal) decimal.Decimal {
+	level, ok := d.mapping[levelMapKey(price)]
+	if ok {
+		for _, order := range level.Orders.Iter() {
+			if quantity.LessThanOrEqual(order.Quantity) {
+				// Given order (taker) is fully
+				// matched against the one found in
+				// the order book (maker).
+				order.Quantity = order.Quantity.Sub(quantity)
+				if order.Quantity.IsZero() {
+					d.RemoveOrder(price, order.ID)
+				}
+				// TODO: Report trade.
+				return decimal.Zero
+			} else {
+				// Given order (taker) gets partially
+				// executed against an order from the
+				// order book (maker).
+				quantity = quantity.Sub(order.Quantity)
+				order.Quantity = decimal.Zero
+				d.RemoveOrder(price, order.ID)
+				// TODO: Report trade.
+			}
+		}
+	}
+	return quantity
+}
 
 func (d *Ladder) Walk(f func(level *Level) bool) {
 	d.heap.Walk(f)
