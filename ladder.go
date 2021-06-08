@@ -2,6 +2,7 @@ package orderbook
 
 import (
 	"container/heap"
+	"fmt"
 
 	"github.com/shopspring/decimal"
 )
@@ -66,32 +67,40 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 
 // MatchOrder tries to match the given quantity at the given price.
 // Returns the quantity unmatched.
-func (d *Ladder) MatchOrder(price decimal.Decimal, quantity decimal.Decimal) decimal.Decimal {
+func (d *Ladder) MatchOrder(price decimal.Decimal, taker Order) decimal.Decimal {
 	level, ok := d.mapping[levelMapKey(price)]
 	if ok {
-		for _, order := range level.Orders.Iter() {
-			if quantity.LessThanOrEqual(order.Quantity) {
-				// Given order (taker) is fully
-				// matched against the one found in
-				// the order book (maker).
-				order.Quantity = order.Quantity.Sub(quantity)
-				if order.Quantity.IsZero() {
-					d.RemoveOrder(price, order.ID)
+		remove := make([]*Order, 0, 2)
+		for _, maker := range level.Orders.Iter() {
+			if taker.Quantity.LessThanOrEqual(maker.Quantity) {
+				// Given order (taker) is fully executed against an order
+				// from the order book (maker), which gets partially
+				// executed.
+				maker.Quantity = maker.Quantity.Sub(taker.Quantity)
+				taker.Quantity = decimal.Zero
+				if maker.Quantity.LessThanOrEqual(decimal.Zero) {
+					remove = append(remove, maker)
 				}
 				// TODO: Report trade.
-				return decimal.Zero
+				fmt.Printf("[1] taker=%v maker=%v\n", taker, maker)
+				break
 			} else {
-				// Given order (taker) gets partially
-				// executed against an order from the
-				// order book (maker).
-				quantity = quantity.Sub(order.Quantity)
-				order.Quantity = decimal.Zero
-				d.RemoveOrder(price, order.ID)
+				// Given order (taker) gets partially executed against an
+				// order from the order book (maker), which gets fully
+				// executed.
+				taker.Quantity = taker.Quantity.Sub(maker.Quantity)
+				maker.Quantity = decimal.Zero
+				remove = append(remove, maker)
+				fmt.Printf("[2] taker=%v maker=%v\n", taker, maker)
 				// TODO: Report trade.
 			}
 		}
+
+		for _, order := range remove {
+			d.RemoveOrder(price, order.ID)
+		}
 	}
-	return quantity
+	return taker.Quantity
 }
 
 func (d *Ladder) Walk(f func(level *Level) bool) {

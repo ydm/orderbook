@@ -1,6 +1,10 @@
 package orderbook
 
-import "github.com/shopspring/decimal"
+import (
+	"fmt"
+
+	"github.com/shopspring/decimal"
+)
 
 const (
 	TypeLimit = iota
@@ -23,4 +27,8 @@ func NewOrder(id string, quantity decimal.Decimal) Order {
 		ID:       id,
 		Quantity: quantity,
 	}
+}
+
+func (o Order) String() string {
+	return fmt.Sprintf("[Order ID=%s Quantity=%v]", o.ID, o.Quantity)
 }

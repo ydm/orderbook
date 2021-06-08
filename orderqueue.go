@@ -1,6 +1,9 @@
 package orderbook
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // binarySearch returns index of the search key, if it is contained in
 // the array, otherwise (-(insertion point) – 1).
@@ -108,4 +111,14 @@ func (q *OrderQueue) Len() int {
 		panic("invariant")
 	}
 	return len(q.queue)
+}
+
+func (q *OrderQueue) String() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "    [OrderQueue\n")
+	for _, order := range q.queue {
+		fmt.Fprintf(&b, "      %v\n", order)
+	}
+	fmt.Fprintf(&b, "]")
+	return b.String()
 }

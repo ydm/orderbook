@@ -1,6 +1,11 @@
 package orderbook
 
-import "github.com/shopspring/decimal"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/shopspring/decimal"
+)
 
 // +-------+
 // | Level |
@@ -43,6 +48,15 @@ func (v *Level) Less(rhs *Level) bool {
 	return v.Key().LessThan(rhs.Key())
 }
 
+func (v *Level) String() string {
+	t := "ask"
+	if v.Type == Bid {
+		t = "bid"
+	}
+	return fmt.Sprintf("  [Level Price=%v Orders(%d) Type=%s]\n%s",
+		v.Price, v.Orders.Len(), t, v.Orders.String())
+}
+
 // +-----------+
 // | LevelHeap |
 // +-----------+
@@ -69,6 +83,20 @@ func (h LevelHeap) Swap(i, j int) {
 	h[j].index = j
 }
 
+func (h LevelHeap) Walk(f func(level *Level) bool) {
+	Walk(h, f)
+}
+
+func (h LevelHeap) String() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "[LevelHeap \n")
+	for _, x := range h {
+		fmt.Fprintf(&b, "%v\n", x)
+	}
+	fmt.Fprintf(&b, "]")
+	return b.String()
+}
+
 func (h *LevelHeap) Push(p interface{}) {
 	level := p.(*Level)
 	level.index = len(*h)
@@ -81,10 +109,6 @@ func (h *LevelHeap) Pop() interface{} {
 	level.index = -1
 	*h = (*h)[:n-1]
 	return level
-}
-
-func (h *LevelHeap) Walk(f func(level *Level) bool) {
-	Walk(*h, f)
 }
 
 // +----------+

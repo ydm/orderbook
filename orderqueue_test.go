@@ -3,6 +3,8 @@ package orderbook
 import (
 	"strconv"
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
 
 func TestBinarySearch(t *testing.T) {
@@ -15,7 +17,7 @@ func TestBinarySearch(t *testing.T) {
 	xs := []int{1, 3, 6, 10, 15, 21, 28, 36, 45, 55}
 	ys := make([]*Order, len(xs))
 	for i, x := range xs {
-		order := NewOrder(strconv.Itoa(i), newDecimalPanic("1"))
+		order := NewOrder(strconv.Itoa(i), decimal.NewFromInt(1))
 		ys[i] = &order
 		ys[i].insertionIndex = x
 	}
@@ -37,7 +39,7 @@ func TestOrderQueue(t *testing.T) {
 	}
 
 	inp := Order{
-		Quantity: newDecimalPanic("1"),
+		Quantity: decimal.NewFromInt(1),
 		ID:       "7bfa0e20",
 	}
 	q.Add(inp)
@@ -70,7 +72,7 @@ func TestOrderQueue_Remove(t *testing.T) {
 	for i := 0; i < N; i++ {
 		s := strconv.Itoa(i)
 		o := Order{
-			Quantity: newDecimalPanic(s),
+			Quantity: decimal.NewFromInt(int64(i)),
 			ID:       s,
 		}
 		q.Add(o)
@@ -82,7 +84,7 @@ func TestOrderQueue_Remove(t *testing.T) {
 		}
 		s := strconv.Itoa(i)
 		popped := q.Remove()
-		if popped.ID != s || !popped.Quantity.Equal(newDecimalPanic(s)) {
+		if popped.ID != s || !popped.Quantity.Equal(decimal.NewFromInt(int64(i))) {
 			t.Errorf("have={%s %v}, want={%s, %s}", popped.ID, popped.Quantity, s, s)
 		}
 		if q.Len() != (N - i - 1) {
@@ -97,7 +99,7 @@ func TestOrderQueue_RemoveByID(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		s := strconv.Itoa(i)
 		o := Order{
-			Quantity: newDecimalPanic(s),
+			Quantity: decimal.NewFromInt(int64(i)),
 			ID:       s,
 		}
 		q.Add(o)
