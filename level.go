@@ -13,19 +13,19 @@ import (
 // binarySearch returns index of the search key, if it is contained in
 // the array, otherwise (-(insertion point) – 1).
 func binarySearch(xs []Order, x int) int {
-	i, j := 0, len(xs)
-	for i < j {
-		h := i + (j-i)/2
-		if xs[h].InsertionIndex < x {
-			i = h + 1
+	low, high := 0, len(xs)
+	for low < high {
+		mid := low + (high-low)/2
+		if xs[mid].insertionIndex < x {
+			low = mid + 1
 		} else {
-			j = h
+			high = mid
 		}
 	}
-	if i < len(xs) && xs[i].InsertionIndex == x {
-		return i
+	if low < len(xs) && xs[low].insertionIndex == x {
+		return low
 	} else {
-		return -i - 1
+		return -low - 1
 	}
 }
 
@@ -36,7 +36,8 @@ type OrderQueue struct {
 	queue []Order
 
 	// indices maps an order ID to its insertion order index.
-	// This way removing by ID takes O(2logN) + copy().
+	// This way removing by ID may use binarySearch() and thus
+	// take O(2logN + copy).
 	indices map[string]int
 
 	next int
@@ -55,23 +56,37 @@ func (q *OrderQueue) Add(order Order) bool {
 		// There is already an order with this ID.
 		return false
 	}
-	order.InsertionIndex = q.next
-	q.queue = append(q.queue, order)
+
+	// Set insertionIndex to order and also save it to our
+	// ID -> insertionIndex mapping.
+	order.insertionIndex = q.next
 	q.indices[order.ID] = q.next
 	q.next++
+
+	// Append order to queue.
+	q.queue = append(q.queue, order)
+
 	return true
 }
 
 func (q *OrderQueue) Remove() Order {
+	// Take order.
 	order := q.queue[0]
+
+	// Pop queue.
 	q.queue = q.queue[1:]
+
+	// Delete from the ID -> index mapping.
 	delete(q.indices, order.ID)
+
 	return order
 }
 
 func (q *OrderQueue) RemoveByID(orderID string) bool {
+	// Check if we have an order with this ID.
 	insertionIndex, ok := q.indices[orderID]
 	if ok {
+		// If yes, locate its index in the queue.
 		i := binarySearch(q.queue, insertionIndex)
 		if i >= 0 {
 			order := q.queue[i]
@@ -89,8 +104,11 @@ func (q *OrderQueue) RemoveByID(orderID string) bool {
 }
 
 func (q *OrderQueue) Len() int {
+	// Len() also makes sure both of our data structures have the
+	// same length.
 	if len(q.queue) != len(q.indices) {
-		fmt.Printf("%d %d\n", len(q.queue), len(q.indices))
+		fmt.Printf("len(queue)=%d len(indices)=%d\n",
+			len(q.queue), len(q.indices))
 		panic("invariant")
 	}
 	return len(q.queue)
@@ -108,9 +126,9 @@ const (
 // Level represents a level in the order book (either ask or bid).  It
 // has a price and a queue of limit orders waiting to get executed.
 type Level struct {
-	Price  decimal.Decimal // Also serves as key in the heap.
+	Price  decimal.Decimal // Also serves as Key() in the heap.
 	Orders OrderQueue      // All of the orders on this level.
-	Type   int             // Ask or Bid.  TODO: Remove!
+	Type   int             // Ask or Bid, controls behavior of Key().
 	index  int             // Heap index.
 }
 
@@ -141,7 +159,9 @@ func (v *Level) Less(rhs *Level) bool {
 // | LevelHeap |
 // +-----------+
 
-// LevelHeap lets us iterate Levels ordered by price.
+// LevelHeap lets us dynamically insert and remove orders in O(logN)
+// and also iterate Levels ordered by price with a just bit of extra
+// work [see Walk()].
 type LevelHeap []*Level
 
 func NewLevelHeap(n int) LevelHeap {
@@ -191,8 +211,7 @@ type LevelMap map[decimal.Decimal]*Level
 // +--------+
 
 // Ladder keeps all price levels and their respective orders, allows
-// iteration and querying by price or order ID.  Ladder is either of
-// type Ask or Bid.
+// inspections and modifications.  It is either of type Ask or Bid.
 type Ladder struct {
 	mapping LevelMap  // Maps price to level.
 	heap    LevelHeap // Holds all levels in a convenient container.
@@ -208,32 +227,42 @@ func NewLadder(ladderType int) Ladder {
 }
 
 func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
-	// First check if level exists.
+	// First check if this level exists.
 	level, ok := d.mapping[price]
 	if ok {
+		// Add the order to this existing level.
 		return level.Orders.Add(o)
 	}
 
-	// Level does not exist, create it and add the order.
+	// Level does not exist.  Create it and add the order.
 	level = NewLevel(price, d.Type)
 	if !level.Orders.Add(o) {
 		panic("illegal state")
 	}
 
-	// Save the newly made level into our data structures.
+	// Save the newly made level into our heap and mapping.
 	d.mapping[price] = level
 	heap.Push(&d.heap, level)
+
 	return true
 }
 
 func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
+	// Check if this level exists.
 	level, ok := d.mapping[price]
 	if ok {
+		// Remove the order by its ID.
 		ans := level.Orders.RemoveByID(ID)
+
+		// If at this point the level is empty, remove it from
+		// this Ladder.
 		if level.Orders.Len() <= 0 {
-			heap.Remove(&d.heap, level.index)
 			delete(d.mapping, price)
+			if heap.Remove(&d.heap, level.index) == nil {
+				panic("illegal state")
+			}
 		}
+
 		return ans
 	}
 	return false
@@ -242,30 +271,3 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 func (d *Ladder) Walk(f func(level *Level) bool) {
 	d.heap.Walk(f)
 }
-
-// func (h *LevelHeap) AddOrder(price decimal.Decimal, o Order) {
-// 	level, ok := h.Find(price)
-// 	if ok {
-// 		level.Orders.Add(o)
-// 	} else {
-// 		Level{
-// 		}
-// 	}
-
-// 	if h.Contains()
-// 	h.Walk(func(level Level) bool {
-
-// 	})
-// }
-
-// func (h *LevelHeap) Find(price decimal.Decimal) (level *Level, ok bool) {
-// 	h.Walk(func(x Level) bool {
-// 		if x.Price.Equal(price) {
-// 			level = x
-// 			ok = true
-// 			return false
-// 		}
-// 		return true
-// 	})
-// 	return
-// }

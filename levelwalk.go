@@ -63,7 +63,6 @@ func Walk(h LevelHeap, f func(level *Level) bool) {
 		}
 		push(2*index + 1) // Left child.
 		push(2*index + 2) // Right child.
-		fmt.Printf("index=%d left=%d right=%d len=%d\n", index, 2*index+1, 2*index+2, len(h))
 
 		if !f(h[index]) {
 			break

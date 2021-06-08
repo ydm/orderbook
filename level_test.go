@@ -2,7 +2,6 @@ package orderbook
 
 import (
 	"container/heap"
-	"fmt"
 	"strconv"
 	"testing"
 
@@ -19,7 +18,7 @@ func TestBinarySearch(t *testing.T) {
 	xs := []int{1, 3, 6, 10, 15, 21, 28, 36, 45, 55}
 	ys := make([]Order, len(xs))
 	for i, x := range xs {
-		ys[i].InsertionIndex = x
+		ys[i].insertionIndex = x
 	}
 	assertEq(binarySearch(ys, 1), 0)
 	assertEq(binarySearch(ys, 3), 1)
@@ -225,8 +224,6 @@ func TestLadder_RemoveOrder(t *testing.T) {
 	index := 0
 	d.Walk(func(level *Level) bool {
 		t.Helper()
-
-		fmt.Printf("level=%v\n", level)
 
 		if level.Price.String() != expected[index] {
 			t.Errorf("have %v, want %v", level.Price.String(), expected[index])
