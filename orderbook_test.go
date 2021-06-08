@@ -2,11 +2,22 @@ package orderbook
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/shopspring/decimal"
 )
+
+func assertCountLevels(t *testing.T, b *Book, asks, bids int) {
+	t.Helper()
+
+	if have := b.asks.heap.CountLevels(); have != asks {
+		t.Errorf("have %d, want %d", have, asks)
+	}
+
+	if have := b.bids.heap.CountLevels(); have != bids {
+		t.Errorf("have %d, want %d", have, bids)
+	}
+}
 
 // Submit a market order against an empty order book.
 func TestBook_AddOrder_1(t *testing.T) {
@@ -18,7 +29,10 @@ func TestBook_AddOrder_1(t *testing.T) {
 		ID:               "id1",
 		Type:             TypeMarket,
 	}
+	assertCountLevels(t, b, 0, 0)
 	err := b.AddOrder(order)
+	assertCountLevels(t, b, 0, 0)
+
 	if !errors.Is(err, ErrMarketNotFullyExecuted) {
 		t.Error()
 	}
@@ -38,7 +52,7 @@ func TestBook_AddOrder_2(t *testing.T) {
 		Side:             SideSell,
 		OriginalQuantity: decimal.NewFromInt(2),
 		ExecutedQuantity: decimal.Zero,
-		Price:            decimal.NewFromInt(10000),
+		Price:            decimal.NewFromInt(10_000),
 		ID:               "limit",
 		Type:             TypeLimit,
 	}
@@ -49,6 +63,7 @@ func TestBook_AddOrder_2(t *testing.T) {
 		ID:               "market",
 		Type:             TypeMarket,
 	}
+	assertCountLevels(t, b, 0, 0)
 	if err := b.AddOrder(limit); err != nil {
 		t.Error(err)
 	}
@@ -56,6 +71,7 @@ func TestBook_AddOrder_2(t *testing.T) {
 		t.Error(err)
 	}
 
-	fmt.Printf("%v\n", b.asks)
-	fmt.Printf("%v\n", b.bids)
+	if have := b.asks.TotalQuantity(decimal.NewFromInt(10_000)); !have.Equal(decimal.NewFromInt(1)) {
+		t.Errorf("have %v, want 1", have)
+	}
 }

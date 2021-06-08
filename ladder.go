@@ -121,6 +121,14 @@ func (d *Ladder) GetOrder(price decimal.Decimal, id string) (Order, bool) {
 	return Order{}, false
 }
 
+func (d *Ladder) TotalQuantity(price decimal.Decimal) decimal.Decimal {
+	level, ok := d.mapping[levelMapKey(price)]
+	if ok {
+		return level.TotalQuantity()
+	}
+	return decimal.Zero
+}
+
 func (d *Ladder) Walk(f func(level *Level) bool) {
 	d.heap.Walk(f)
 }

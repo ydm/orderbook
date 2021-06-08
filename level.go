@@ -57,6 +57,14 @@ func (v *Level) String() string {
 		v.Price, v.Orders.Len(), t, v.Orders.String())
 }
 
+func (v *Level) TotalQuantity() decimal.Decimal {
+	ans := decimal.Zero
+	for _, x := range v.Orders.Iter() {
+		ans = ans.Add(x.Quantity)
+	}
+	return ans
+}
+
 // +-----------+
 // | LevelHeap |
 // +-----------+
@@ -85,6 +93,15 @@ func (h LevelHeap) Swap(i, j int) {
 
 func (h LevelHeap) Walk(f func(level *Level) bool) {
 	Walk(h, f)
+}
+
+func (h LevelHeap) CountLevels() int {
+	ans := 0
+	h.Walk(func(level *Level) bool {
+		ans++
+		return true
+	})
+	return ans
 }
 
 func (h LevelHeap) String() string {
