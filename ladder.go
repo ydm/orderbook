@@ -2,7 +2,6 @@ package orderbook
 
 import (
 	"container/heap"
-	"fmt"
 
 	"github.com/shopspring/decimal"
 )
@@ -65,9 +64,9 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 	return false
 }
 
-// MatchOrder tries to match the given quantity at the given price.
-// Returns the quantity unmatched.
-func (d *Ladder) MatchOrder(price decimal.Decimal, taker Order) decimal.Decimal {
+// MatchOrderLimit tries to match the given quantity at the given
+// price.  Returns the quantity unmatched.
+func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) decimal.Decimal {
 	level, ok := d.mapping[levelMapKey(price)]
 	if ok {
 		remove := make([]*Order, 0, 2)
@@ -82,7 +81,7 @@ func (d *Ladder) MatchOrder(price decimal.Decimal, taker Order) decimal.Decimal 
 					remove = append(remove, maker)
 				}
 				// TODO: Report trade.
-				fmt.Printf("[1] taker=%v maker=%v\n", taker, maker)
+				// fmt.Printf("[1] taker=%v maker=%v\n", taker, maker)
 				break
 			} else {
 				// Given order (taker) gets partially executed against an
@@ -91,7 +90,7 @@ func (d *Ladder) MatchOrder(price decimal.Decimal, taker Order) decimal.Decimal 
 				taker.Quantity = taker.Quantity.Sub(maker.Quantity)
 				maker.Quantity = decimal.Zero
 				remove = append(remove, maker)
-				fmt.Printf("[2] taker=%v maker=%v\n", taker, maker)
+				// fmt.Printf("[2] taker=%v maker=%v\n", taker, maker)
 				// TODO: Report trade.
 			}
 		}
