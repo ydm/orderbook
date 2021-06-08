@@ -1,80 +1,144 @@
 package orderbook
 
 import (
-	"sync"
-
+	"container/heap"
+	"fmt"
 	"orderbook/pkg/decimal"
+	"sync"
 )
 
 // +------------+
 // | OrderQueue |
 // +------------+
 
-// OrderQueue holds all the orders at a particular level of the order book.
-type OrderQueue []Order
+// OrderQueue holds all the orders at a particular level of the order book.  It keeps them
+// in a queue (FIFO) and also allows quick access using an ID.
+type OrderQueue struct {
+	queue   []Order
+	indices map[string]int
+	mu      sync.Mutex
+}
 
 func NewOrderQueue(n int) OrderQueue {
-	return make([]Order, 0, n)
+	return OrderQueue{
+		queue:   make([]Order, 0, n),
+		indices: make(map[string]int),
+	}
 }
 
 func (q *OrderQueue) Add(o Order) {
-	*q = append(*q, o)
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	_, ok := q.indices[o.ID]
+	if ok {
+		// There is already an order with this ID.
+		return
+	}
+	q.indices[o.ID] = len(q.queue)
+	q.queue = append(q.queue, o)
 }
 
 func (q *OrderQueue) Remove() Order {
-	old := *q
-	o := old[0]
-	*q = old[1:]
-	return o
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	item := q.queue[0]
+	q.queue = q.queue[1:]
+	delete(q.indices, item.ID)
+	return item
 }
 
-func (q OrderQueue) Len() int {
-	return len(q)
-}
+func (q *OrderQueue) RemoveByID(orderID string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 
-// +----------+
-// | LevelMap |
-// +----------+
-
-// LevelMap maps Price keys to OrderQueue values.
-type LevelMap struct {
-	inner sync.Map
-}
-
-func (m *LevelMap) Delete(price decimal.Decimal) {
-	m.inner.Delete(price)
-}
-
-func (m *LevelMap) Load(price decimal.Decimal) (queue OrderQueue, ok bool) {
-	var value interface{}
-	value, ok = m.inner.Load(price)
-	queue = value.(OrderQueue)
-	return
-}
-
-func (m *LevelMap) LoadAndDelete(price decimal.Decimal) (queue OrderQueue, loaded bool) {
-	var value interface{}
-	value, loaded = m.inner.LoadAndDelete(price)
-	queue = value.(OrderQueue)
-	return
-}
-
-func (m *LevelMap) LoadOrStore(key, queue OrderQueue) (actual OrderQueue, loaded bool) {
-	var value interface{}
-	value, loaded = m.inner.LoadOrStore(key, queue)
-	actual = value.(OrderQueue)
-	return
-}
-
-func (m *LevelMap) Range(f func(price decimal.Decimal, queue OrderQueue) bool) {
-	g := func(key, queue interface{}) bool {
-		a := key.(decimal.Decimal)
-		b := queue.(OrderQueue)
-		return f(a, b)
+	index, ok := q.indices[orderID]
+	if ok {
+		copy(q.queue[index:], q.queue[index+1:])
+		q.queue = q.queue[:len(q.queue)-1]
+		delete(q.indices, orderID)
 	}
-	m.inner.Range(g)
+	return ok
 }
 
-func (m *LevelMap) Store(price decimal.Decimal, queue OrderQueue) {
-	m.inner.Store(price, queue)
+func (q *OrderQueue) Len() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if len(q.queue) != len(q.indices) {
+		fmt.Printf("%d %d\n", len(q.queue), len(q.indices))
+		panic("invariant")
+	}
+	return len(q.queue)
+}
+
+// +-------+
+// | Level |
+// +-------+
+
+// Level represents a level in the order book (either ask or bid).  It
+// has a price and a queue of limit orders waiting to get executed.
+type Level struct {
+	Price  decimal.Decimal
+	Orders OrderQueue
+	key    int64
+}
+
+func NewLevelAsk(price decimal.Decimal) Level {
+	return Level{
+		Price:  price,
+		Orders: NewOrderQueue(0),
+		key:    price.Raw(),
+	}
+}
+
+func NewLevelBid(price decimal.Decimal) Level {
+	return Level{
+		Price:  price,
+		Orders: NewOrderQueue(0),
+		key:    -price.Raw(),
+	}
+}
+
+// +-----------+
+// | LevelHeap |
+// +-----------+
+
+// LevelHeap keeps Levels ordered.
+type LevelHeap []*Level
+
+func NewLevelHeap(n int) LevelHeap {
+	xs := make(LevelHeap, 0, n)
+	heap.Init(&xs)
+	return xs
+}
+
+func (h LevelHeap) Len() int { return len(h) }
+
+func (h LevelHeap) Less(i, j int) bool {
+	return h[i].Price.LessThan(h[j].Price)
+}
+
+func (h LevelHeap) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
+}
+
+func (h *LevelHeap) Push(p interface{}) {
+	level := p.(*Level)
+	*h = append(*h, level)
+}
+
+func (h *LevelHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	*h = old[:n-1]
+	return item
+}
+
+func (h *LevelHeap) AddOrder(price decimal.Decimal, order Order) {
+}
+
+func (h *LevelHeap) Iterate(f func(level *Level) bool) {
 }
