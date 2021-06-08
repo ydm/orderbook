@@ -64,6 +64,14 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 	return false
 }
 
+// func (d *Ladder) MatchOrder(price decimal.Decimal, quantity decimal.Decimal) (Order, bool) {
+// 	level, ok := d.mapping[price]
+// 	if ok {
+// 		for _, order := range level.Orders {
+// 		}
+// 	}
+// }
+
 func (d *Ladder) Walk(f func(level *Level) bool) {
 	d.heap.Walk(f)
 }
