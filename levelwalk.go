@@ -57,10 +57,15 @@ func Walk(h LevelHeap, f func(level *Level) bool) {
 	}
 	push(0)
 	for indices.Len() > 0 {
-		item := heap.Pop(&indices).(Item)
-		push(2*item.index + 1) // Left child.
-		push(2*item.index + 2) // Right child.
-		if !f(h[item.index]) {
+		index := heap.Pop(&indices).(Item).index
+		if index >= len(h) {
+			continue
+		}
+		push(2*index + 1) // Left child.
+		push(2*index + 2) // Right child.
+		fmt.Printf("index=%d left=%d right=%d len=%d\n", index, 2*index+1, 2*index+2, len(h))
+
+		if !f(h[index]) {
 			break
 		}
 	}
