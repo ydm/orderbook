@@ -98,6 +98,18 @@ func (q *OrderQueue) RemoveByID(orderID string) bool {
 	return false
 }
 
+func (q *OrderQueue) GetByID(orderID string) (Order, bool) {
+	insertionIndex, ok := q.indices[orderID]
+	if ok {
+		i := binarySearch(q.queue, insertionIndex)
+		if i >= 0 {
+			order := q.queue[i]
+			return *order, true
+		}
+	}
+	return Order{}, false
+}
+
 func (q *OrderQueue) Iter() []*Order {
 	return q.queue
 }

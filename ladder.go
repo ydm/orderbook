@@ -111,6 +111,14 @@ func (d *Ladder) MatchOrderMarket(taker Order) decimal.Decimal {
 	return taker.Quantity
 }
 
+func (d *Ladder) GetOrder(price decimal.Decimal, id string) (Order, bool) {
+	level, ok := d.mapping[levelMapKey(price)]
+	if ok {
+		return level.Orders.GetByID(id)
+	}
+	return Order{}, false
+}
+
 func (d *Ladder) Walk(f func(level *Level) bool) {
 	d.heap.Walk(f)
 }

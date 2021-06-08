@@ -209,3 +209,24 @@ func TestLadder_MatchOrderMarket_1(t *testing.T) {
 		t.Error()
 	}
 }
+
+func TestLadder_GetOrder(t *testing.T) {
+	d := NewLadder(Ask)
+
+	_, ok := d.GetOrder(decimal.NewFromInt(9), "id1")
+	if ok {
+		t.Error()
+	}
+	d.AddOrder(decimal.NewFromInt(9), NewOrder("id1", decimal.NewFromInt(10)))
+
+	order, ok := d.GetOrder(decimal.NewFromInt(9), "id1")
+	if !ok {
+		t.Error()
+	}
+	if order.ID != "id1" {
+		t.Error()
+	}
+	if !order.Quantity.Equal(decimal.NewFromInt(10)) {
+		t.Error()
+	}
+}
