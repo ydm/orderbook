@@ -80,7 +80,7 @@ func (v *Level) Less(rhs *Level) bool {
 // +-----------+
 
 // LevelHeap keeps Levels ordered.
-type LevelHeap []*Level
+type LevelHeap []Level
 
 func NewLevelHeap(n int) LevelHeap {
 	xs := make(LevelHeap, 0, n)
@@ -91,7 +91,7 @@ func NewLevelHeap(n int) LevelHeap {
 func (h LevelHeap) Len() int { return len(h) }
 
 func (h LevelHeap) Less(i, j int) bool {
-	return h[i].Less(h[j])
+	return h[i].Less(&h[j])
 }
 
 func (h LevelHeap) Swap(i, j int) {
@@ -99,7 +99,7 @@ func (h LevelHeap) Swap(i, j int) {
 }
 
 func (h *LevelHeap) Push(p interface{}) {
-	level := p.(*Level)
+	level := p.(Level)
 	*h = append(*h, level)
 }
 
