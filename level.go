@@ -10,7 +10,8 @@ import (
 // +------------+
 
 // OrderQueue holds all the orders at a particular level of the order book.  It keeps them
-// in a queue (FIFO) and also allows quick access using an ID.
+// in a queue (FIFO), so orders of the same price level get executed in the order they
+// were submitted.
 type OrderQueue []Order
 
 func NewOrderQueue(n int) OrderQueue {
@@ -45,53 +46,48 @@ const (
 type Level struct {
 	Price  decimal.Decimal // Also serves as key in the heap.
 	Orders OrderQueue      // All of the orders on this level.
-	Type   int             // Ask or Bid.
+	Type   int             // Ask or Bid.  TODO: Remove!
 }
 
-func NewLevelAsk(price decimal.Decimal) Level {
-	return Level{
+func NewLevel(price decimal.Decimal, levelType int) *Level {
+	return &Level{
 		Price:  price,
-		Orders: NewOrderQueue(0),
-		Type:   Ask,
+		Orders: NewOrderQueue(16),
+		Type:   levelType,
 	}
 }
 
-func NewLevelBid(price decimal.Decimal) Level {
-	return Level{
-		Price:  price,
-		Orders: NewOrderQueue(0),
-		Type:   Bid,
+func (v *Level) Key() int64 {
+	switch v.Type {
+	case Ask:
+		return v.Price.Raw()
+	case Bid:
+		return -v.Price.Raw()
+	default:
+		panic("illegal type")
 	}
 }
 
 func (v *Level) Less(rhs *Level) bool {
-	switch v.Type {
-	case Ask:
-		return v.Price.LessThan(rhs.Price)
-	case Bid:
-		return v.Price.GreaterThan(rhs.Price)
-	default:
-		panic("illegal type")
-	}
+	return v.Key() < rhs.Key()
 }
 
 // +-----------+
 // | LevelHeap |
 // +-----------+
 
-// LevelHeap keeps Levels ordered.
-type LevelHeap []Level
+// LevelHeap lets us iterate Levels ordered by price.
+type LevelHeap []*Level
 
 func NewLevelHeap(n int) LevelHeap {
-	xs := make(LevelHeap, 0, n)
-	heap.Init(&xs)
+	xs := make([]*Level, 0, n)
 	return xs
 }
 
 func (h LevelHeap) Len() int { return len(h) }
 
 func (h LevelHeap) Less(i, j int) bool {
-	return h[i].Less(&h[j])
+	return h[i].Less(h[j])
 }
 
 func (h LevelHeap) Swap(i, j int) {
@@ -99,20 +95,84 @@ func (h LevelHeap) Swap(i, j int) {
 }
 
 func (h *LevelHeap) Push(p interface{}) {
-	level := p.(Level)
+	level := p.(*Level)
 	*h = append(*h, level)
 }
 
 func (h *LevelHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	item := old[n-1]
-	*h = old[:n-1]
+	n := len(*h)
+	item := (*h)[n-1]
+	*h = (*h)[:n-1]
 	return item
 }
 
-func (h *LevelHeap) AddOrder(price decimal.Decimal, order Order) {
+func (h *LevelHeap) Walk(f func(level *Level) bool) {
+	Walk(*h, f)
 }
 
-func (h *LevelHeap) Iterate(f func(level *Level) bool) {
+// +----------+
+// | LevelMap |
+// +----------+
+
+// LevelMap maps Price to Level.
+type LevelMap map[decimal.Decimal]*Level
+
+// +--------+
+// | Ladder |
+// +--------+
+
+// Ladder keeps all price levels and their respective orders, allows
+// iteration and querying by price.
+type Ladder struct {
+	Map  LevelMap
+	Heap LevelHeap
+	Type int // Ask or Bid.
 }
+
+func NewLadder() Ladder {
+	return Ladder{
+		Map:  make(LevelMap),
+		Heap: make(LevelHeap, 0, 256),
+	}
+}
+
+func (d *Ladder) AddOrder(price decimal.Decimal, o Order) {
+	level, ok := d.Map[price]
+	if ok {
+		level.Orders.Add(o)
+	}
+	level = NewLevel(price, d.Type)
+	d.Map[price] = level
+	heap.Push(&d.Heap, level)
+}
+
+func (d *Ladder) Walk(f func(level *Level) bool) {
+	d.Heap.Walk(f)
+}
+
+// func (h *LevelHeap) AddOrder(price decimal.Decimal, o Order) {
+// 	level, ok := h.Find(price)
+// 	if ok {
+// 		level.Orders.Add(o)
+// 	} else {
+// 		Level{
+// 		}
+// 	}
+
+// 	if h.Contains()
+// 	h.Walk(func(level Level) bool {
+
+// 	})
+// }
+
+// func (h *LevelHeap) Find(price decimal.Decimal) (level *Level, ok bool) {
+// 	h.Walk(func(x Level) bool {
+// 		if x.Price.Equal(price) {
+// 			level = x
+// 			ok = true
+// 			return false
+// 		}
+// 		return true
+// 	})
+// 	return
+// }
