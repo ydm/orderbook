@@ -4,7 +4,7 @@ import "fmt"
 
 // binarySearch returns index of the search key, if it is contained in
 // the array, otherwise (-(insertion point) – 1).
-func binarySearch(xs []Order, x int) int {
+func binarySearch(xs []*Order, x int) int {
 	low, high := 0, len(xs)
 	for low < high {
 		mid := low + (high-low)/2
@@ -25,7 +25,7 @@ func binarySearch(xs []Order, x int) int {
 // in a queue (FIFO), so orders of the same price level get executed in the order they
 // were submitted.  OrderQueue also allows querying using the order ID.
 type OrderQueue struct {
-	queue []Order
+	queue []*Order
 
 	// indices maps an order ID to its insertion order index.
 	// This way removing by ID may use binarySearch() and thus
@@ -37,7 +37,7 @@ type OrderQueue struct {
 
 func NewOrderQueue(n int) OrderQueue {
 	return OrderQueue{
-		queue:   make([]Order, 0, n),
+		queue:   make([]*Order, 0, n),
 		indices: make(map[string]int),
 	}
 }
@@ -56,12 +56,12 @@ func (q *OrderQueue) Add(order Order) bool {
 	q.next++
 
 	// Append order to queue.
-	q.queue = append(q.queue, order)
+	q.queue = append(q.queue, &order)
 
 	return true
 }
 
-func (q *OrderQueue) Remove() Order {
+func (q *OrderQueue) Remove() *Order {
 	// Take order.
 	order := q.queue[0]
 

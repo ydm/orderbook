@@ -15,8 +15,10 @@ func TestBinarySearch(t *testing.T) {
 		}
 	}
 	xs := []int{1, 3, 6, 10, 15, 21, 28, 36, 45, 55}
-	ys := make([]Order, len(xs))
+	ys := make([]*Order, len(xs))
 	for i, x := range xs {
+		order := NewOrder(strconv.Itoa(i), decimal.NewFromStringPanic("1"))
+		ys[i] = &order
 		ys[i].insertionIndex = x
 	}
 	assertEq(binarySearch(ys, 1), 0)
