@@ -13,7 +13,6 @@ import (
 	"orderbook"
 
 	"github.com/gorilla/mux"
-	"github.com/shopspring/decimal"
 )
 
 type BookKeyType int
@@ -38,41 +37,85 @@ func Interrupt(ctx context.Context) bool {
 	}
 }
 
-func GoInterrupt(ctx context.Context, cancel context.CancelFunc) {
-	go func() {
-		if Interrupt(ctx) {
-			cancel()
-		}
-	}()
+func respond(w http.ResponseWriter, r Response) {
+	encoded, err := json.Marshal(r)
+	if err != nil {
+		fmt.Printf("WRN Error while encoding response: %v\n", err)
+		w.WriteHeader(500)
+	} else {
+		fmt.Fprint(w, string(encoded))
+	}
 }
 
-func handler(writer http.ResponseWriter, request *http.Request) {
-	request.Context()
-	fmt.Printf("%v\n", request)
-}
+// +------------------+
+// | (1) Submit order |
+// +------------------+
 
 func addOrder(writer http.ResponseWriter, request *http.Request) {
 	body, err := ioutil.ReadAll(request.Body)
-	fmt.Printf("body:\n%v", body)
 	if err != nil {
-		// TODO
-		panic(err)
+		respond(writer, Response{Error: err.Error()})
+		return
 	}
-	// fmt.Fprint(writer, "TODO")
+
+	var order orderbook.ClientOrder
+	err = json.Unmarshal(body, &order)
+	if err != nil {
+		respond(writer, Response{Error: err.Error()})
+		return
+	}
+
+	b := request.Context().Value(BookKey).(*orderbook.Book)
+	err = b.AddOrder(order)
+	if err != nil {
+		respond(writer, Response{Error: err.Error()})
+		return
+	}
+	respond(writer, Response{Response: order})
 }
 
-func queryOrder(writer http.ResponseWriter, request *http.Request) {
-
-}
+// +------------------+
+// | (2) Cancel order |
+// +------------------+
 
 func cancelOrder(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	id := vars["id"]
 
+	b := request.Context().Value(BookKey).(*orderbook.Book)
+	err := b.CancelOrder(id)
+	if err == nil {
+		respond(writer, Response{Response: true})
+	} else {
+		respond(writer, Response{Error: err.Error()})
+	}
 }
 
+// +---------------+
+// | (3) Get order |
+// +---------------+
+
+func queryOrder(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	id := vars["id"]
+
+	b := request.Context().Value(BookKey).(*orderbook.Book)
+	order, err := b.GetOrder(id)
+	if err != nil {
+		respond(writer, Response{Error: err.Error()})
+		return
+	}
+	respond(writer, Response{Response: order})
+}
+
+// +-------------------------+
+// | (5) Order book snapshot |
+// +-------------------------+
+
 type bookResponse struct {
-	Symbol string                  `json:"symbol"`
-	Asks   []orderbook.ClientLevel `json:"asks"`
-	Bids   []orderbook.ClientLevel `json:"bids"`
+	// Symbol string                  `json:"symbol"`
+	Asks []orderbook.ClientLevel `json:"asks"`
+	Bids []orderbook.ClientLevel `json:"bids"`
 }
 
 func book(writer http.ResponseWriter, request *http.Request) {
@@ -87,28 +130,22 @@ func book(writer http.ResponseWriter, request *http.Request) {
 
 	b := request.Context().Value(BookKey).(*orderbook.Book)
 	snapshot := b.GetSnapshot(depth)
-
-	r := Response{
+	respond(writer, Response{
 		Response: bookResponse{
-			Symbol: "generic",
-			Asks:   snapshot.Asks,
-			Bids:   snapshot.Bids,
+			Asks: snapshot.Asks,
+			Bids: snapshot.Bids,
 		},
-		Error: "",
-	}
-	encoded, err := json.Marshal(r)
-	if err != nil {
-		fmt.Printf("WRN book: Error while encoding response: %v\n", err)
-		writer.WriteHeader(500)
-	} else {
-		fmt.Fprint(writer, string(encoded))
-	}
+	})
 }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	GoInterrupt(ctx, cancel)
+	go func() {
+		if Interrupt(ctx) {
+			cancel()
+		}
+	}()
 
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/orders/", addOrder).Methods("POST")
@@ -117,22 +154,6 @@ func main() {
 	router.HandleFunc("/book/", book).Methods("GET")
 
 	b := orderbook.NewBook()
-	for price := 11; price <= 30; price++ {
-		for i := 0; i < price; i++ {
-			order := orderbook.ClientOrder{
-				Side:             orderbook.SideBuy,
-				OriginalQuantity: decimal.NewFromInt(int64(2 * price)),
-				ExecutedQuantity: decimal.Zero,
-				Price:            decimal.NewFromInt(int64(price)),
-				ID:               fmt.Sprintf("%d_%d", price, i),
-				Type:             orderbook.TypeLimit,
-			}
-			if price >= 21 {
-				order.Side = orderbook.SideSell
-			}
-			b.AddOrder(order)
-		}
-	}
 	f := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), BookKey, b)

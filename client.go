@@ -22,12 +22,12 @@ const (
 
 type ClientOrder struct {
 	// Symbol           string
-	Side             int
-	OriginalQuantity decimal.Decimal
-	ExecutedQuantity decimal.Decimal
-	Price            decimal.Decimal
-	ID               string
-	Type             int
+	Side             int             `json:"side"`
+	OriginalQuantity decimal.Decimal `json:"quantity"`
+	ExecutedQuantity decimal.Decimal `json:"executedQuantity"`
+	Price            decimal.Decimal `json:"price"`
+	ID               string          `json:"id"`
+	Type             int             `json:"type"`
 	// State            int
 }
 
