@@ -32,8 +32,8 @@ type ClientOrder struct {
 }
 
 type ClientLevel struct {
-	Price    decimal.Decimal
-	Quantity decimal.Decimal
+	Price    decimal.Decimal `json:"price"`
+	Quantity decimal.Decimal `json:"quantity"`
 }
 
 type Snapshot struct {
