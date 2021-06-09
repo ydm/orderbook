@@ -4,7 +4,6 @@ package orderbook
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/shopspring/decimal"
@@ -176,24 +175,37 @@ func (b *Book) GetOrder(id string) (ClientOrder, error) {
 	return order, nil
 }
 
-func (b *Book) GetSnapshot(depth int) {
+func (b *Book) GetSnapshot(depth int) Snapshot {
+	ans := Snapshot{
+		Asks: make([]ClientLevel, 0, depth),
+		Bids: make([]ClientLevel, 0, depth),
+	}
+
 	askDepth := 0
 	ask := func(level *Level) bool {
-		askDepth += 1
 		if askDepth >= depth {
 			return false
 		}
-		fmt.Printf("ask level: %v\n", level)
+		askDepth++
+
+		ans.Asks = append(ans.Asks, ClientLevel{
+			Price:    level.Price,
+			Quantity: level.TotalQuantity(),
+		})
 		return true
 	}
 
 	bidDepth := 0
 	bid := func(level *Level) bool {
-		bidDepth += 1
 		if bidDepth >= depth {
 			return false
 		}
-		fmt.Printf("bid level: %v\n", level)
+		bidDepth++
+
+		ans.Bids = append(ans.Bids, ClientLevel{
+			Price:    level.Price,
+			Quantity: level.TotalQuantity(),
+		})
 		return true
 	}
 
@@ -201,4 +213,5 @@ func (b *Book) GetSnapshot(depth int) {
 	b.asks.Walk(ask)
 	b.bids.Walk(bid)
 	b.mu.Unlock()
+	return ans
 }

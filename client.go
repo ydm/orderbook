@@ -30,3 +30,13 @@ type ClientOrder struct {
 	Type             int
 	// State            int
 }
+
+type ClientLevel struct {
+	Price    decimal.Decimal
+	Quantity decimal.Decimal
+}
+
+type Snapshot struct {
+	Asks []ClientLevel
+	Bids []ClientLevel
+}

@@ -2,6 +2,7 @@ package orderbook
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -336,4 +337,72 @@ func TestBook_CancelOrder_3(t *testing.T) {
 	if err := b.CancelOrder("limit"); !errors.Is(err, ErrCannotCancelOrder) {
 		t.Error(err)
 	}
+}
+
+func TestBook_GetSnapshot(t *testing.T) {
+	b := NewBook()
+	for price := 11; price <= 30; price++ {
+		for i := 0; i < price; i++ {
+			order := ClientOrder{
+				Side:             SideBuy,
+				OriginalQuantity: decimal.NewFromInt(int64(2 * price)),
+				ExecutedQuantity: decimal.Zero,
+				Price:            decimal.NewFromInt(int64(price)),
+				ID:               fmt.Sprintf("%d_%d", price, i),
+				Type:             TypeLimit,
+			}
+			if price >= 21 {
+				order.Side = SideSell
+			}
+			b.AddOrder(order)
+		}
+	}
+	var snapshot Snapshot
+
+	snapshot = b.GetSnapshot(0)
+	if len(snapshot.Asks) != 0 || len(snapshot.Bids) != 0 {
+		t.Error()
+	}
+
+	snapshot = b.GetSnapshot(5)
+	if len(snapshot.Asks) != 5 || len(snapshot.Bids) != 5 {
+		t.Errorf("have %d and %d, want 5", len(snapshot.Asks), len(snapshot.Bids))
+	}
+
+	snapshot = b.GetSnapshot(20)
+	if len(snapshot.Asks) != 10 || len(snapshot.Bids) != 10 {
+		t.Error()
+	}
+
+	assertEq := func(level ClientLevel, price int64) {
+		t.Helper()
+		if !level.Price.Equal(decimal.NewFromInt(price)) {
+			t.Errorf("have price %v, want price %d", level.Price, price)
+		}
+		if !level.Quantity.Equal(decimal.NewFromInt(2 * price * price)) {
+			t.Error()
+		}
+	}
+
+	assertEq(snapshot.Asks[9], 30)
+	assertEq(snapshot.Asks[8], 29)
+	assertEq(snapshot.Asks[7], 28)
+	assertEq(snapshot.Asks[6], 27)
+	assertEq(snapshot.Asks[5], 26)
+	assertEq(snapshot.Asks[4], 25)
+	assertEq(snapshot.Asks[3], 24)
+	assertEq(snapshot.Asks[2], 23)
+	assertEq(snapshot.Asks[1], 22)
+	assertEq(snapshot.Asks[0], 21)
+
+	assertEq(snapshot.Bids[0], 20)
+	assertEq(snapshot.Bids[1], 19)
+	assertEq(snapshot.Bids[2], 18)
+	assertEq(snapshot.Bids[3], 17)
+	assertEq(snapshot.Bids[4], 16)
+	assertEq(snapshot.Bids[5], 15)
+	assertEq(snapshot.Bids[6], 14)
+	assertEq(snapshot.Bids[7], 13)
+	assertEq(snapshot.Bids[8], 12)
+	assertEq(snapshot.Bids[9], 11)
 }
