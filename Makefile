@@ -1,10 +1,10 @@
-server:
-	go build cmd/server.go
+all: orderbook test server
 
 orderbook:
 	go build
 
-all: orderbook test server
+server:
+	go build cmd/server.go
 
 clean:
 	rm -f server
