@@ -48,6 +48,9 @@ func (b *Book) AddOrder(order ClientOrder) error {
 	if order.OriginalQuantity.LessThanOrEqual(decimal.Zero) {
 		return ErrInvalidQuantity
 	}
+	if !order.ExecutedQuantity.IsZero() {
+		return ErrInvalidQuantity
+	}
 	if order.ID == "" {
 		return ErrInvalidID
 	}
