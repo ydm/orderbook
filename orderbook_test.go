@@ -152,6 +152,13 @@ func TestBook_AddOrder_2(t *testing.T) {
 	assertCountLevels(t, b, 1, 0)
 	assertLevels(t, &b.asks, pq{"10000", "2"})
 
+	// Make sure the same order cannot be submitted twice.
+	if err := b.AddOrder(limit); !errors.Is(err, ErrOrderExists) {
+		t.Error()
+	}
+	assertCountLevels(t, b, 1, 0)
+	assertLevels(t, &b.asks, pq{"10000", "2"})
+
 	// Make sure this market gets matched and what's left in the order book is the
 	// partially executed limit order.
 	if err := b.AddOrder(market); err != nil {

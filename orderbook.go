@@ -65,7 +65,7 @@ func (b *Book) AddOrder(order ClientOrder) error {
 		// the order book.  If the market order is not fully executed, we return
 		// an error.
 		b.mu.Lock()
-		left := op.MatchOrderMarket(x)
+		left, _ := op.MatchOrderMarket(x)
 		b.mu.Unlock()
 
 		order.ExecutedQuantity = order.OriginalQuantity.Sub(left)
@@ -79,7 +79,7 @@ func (b *Book) AddOrder(order ClientOrder) error {
 		// order book.  If the order remains unexecuted, it's placed in the order
 		// book.
 		b.mu.Lock()
-		left := op.MatchOrderLimit(order.Price, x)
+		left, _ := op.MatchOrderLimit(order.Price, x)
 		if left.IsPositive() {
 			my.AddOrder(order.Price, NewOrder(order.ID, left))
 		}

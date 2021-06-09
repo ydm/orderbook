@@ -7,6 +7,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// Matches maps order ID to executed quantity.
+type Matches map[string]decimal.Decimal
+
 // Ladder keeps all price levels and their respective orders, allows
 // inspections and modifications.  It is either of type Ask or Bid.
 type Ladder struct {
@@ -66,9 +69,10 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 }
 
 // MatchOrderLimit tries to match the given quantity at the given
-// price.  Returns the quantity unmatched.
-func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) decimal.Decimal {
+// price.  Returns the order quantity left unmatched.
+func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) (decimal.Decimal, Matches) {
 	level, ok := d.mapping[levelMapKey(price)]
+	matches := make(Matches)
 	if ok {
 		remove := make([]*Order, 0, 2)
 		for _, maker := range level.Orders.Iter() {
@@ -76,23 +80,23 @@ func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) decimal.Dec
 				// Given order (taker) is fully executed against an order
 				// from the order book (maker), which gets partially
 				// executed.
+				matches[maker.ID] = taker.Quantity
 				maker.Quantity = maker.Quantity.Sub(taker.Quantity)
 				taker.Quantity = decimal.Zero
 				if maker.Quantity.LessThanOrEqual(decimal.Zero) {
 					remove = append(remove, maker)
 				}
-				// TODO: Report trade.
 				fmt.Printf("[1] taker=%v maker=%v\n", taker, maker)
 				break
 			} else {
 				// Given order (taker) gets partially executed against an
 				// order from the order book (maker), which gets fully
 				// executed.
+				matches[maker.ID] = maker.Quantity
 				taker.Quantity = taker.Quantity.Sub(maker.Quantity)
 				maker.Quantity = decimal.Zero
 				remove = append(remove, maker)
 				fmt.Printf("[2] taker=%v maker=%v\n", taker, maker)
-				// TODO: Report trade.
 			}
 		}
 
@@ -100,16 +104,21 @@ func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) decimal.Dec
 			d.RemoveOrder(price, order.ID)
 		}
 	}
-	return taker.Quantity
+	return taker.Quantity, matches
 }
 
-func (d *Ladder) MatchOrderMarket(taker Order) decimal.Decimal {
+func (d *Ladder) MatchOrderMarket(taker Order) (decimal.Decimal, Matches) {
+	matches := make(Matches)
 	// While there is still quantity to be matched and the ladder is not empty.
 	for taker.Quantity.IsPositive() && d.heap.Len() > 0 {
 		price := d.heap[0].Price
-		taker.Quantity = d.MatchOrderLimit(price, taker)
+		q, xs := d.MatchOrderLimit(price, taker)
+		taker.Quantity = q
+		for k, v := range xs {
+			matches[k] = v
+		}
 	}
-	return taker.Quantity
+	return taker.Quantity, matches
 }
 
 func (d *Ladder) GetOrder(price decimal.Decimal, id string) (Order, bool) {
