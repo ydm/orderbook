@@ -250,6 +250,7 @@ func TestBook_AddOrder_5(t *testing.T) {
 		t.Error(err)
 	}
 	assertCountLevels(t, b, 1, 0)
+	assertLevels(t, &b.asks, pq{"10000", "1"})
 
 	buy := ClientOrder{
 		Side:             SideBuy,
@@ -263,5 +264,7 @@ func TestBook_AddOrder_5(t *testing.T) {
 		t.Error(err)
 	}
 	assertCountLevels(t, b, 0, 1)
+	assertLevels(t, &b.bids, pq{"10000", "2"})
+
 	assertExecutedQuantities(t, b, iq{"one", "1"}, iq{"two", "1"})
 }

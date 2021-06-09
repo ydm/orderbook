@@ -5,6 +5,8 @@ package orderbook
 import (
 	"errors"
 	"sync"
+
+	"github.com/shopspring/decimal"
 )
 
 var (
@@ -58,6 +60,8 @@ func (b *Book) AddOrder(order ClientOrder) error {
 	}
 
 	x := NewOrder(order.ID, order.OriginalQuantity)
+	var left decimal.Decimal
+	var matches Matches
 
 	switch order.Type {
 	case TypeMarket:
@@ -65,30 +69,37 @@ func (b *Book) AddOrder(order ClientOrder) error {
 		// the order book.  If the market order is not fully executed, we return
 		// an error.
 		b.mu.Lock()
-		left, _ := op.MatchOrderMarket(x)
+		left, matches = op.MatchOrderMarket(x)
 		b.mu.Unlock()
-
-		order.ExecutedQuantity = order.OriginalQuantity.Sub(left)
-		b.database[order.ID] = order
-
-		if !left.IsZero() {
-			return ErrMarketNotFullyExecuted
-		}
 	case TypeLimit:
 		// Limit orders may first be matched against the opposite side of the
 		// order book.  If the order remains unexecuted, it's placed in the order
 		// book.
 		b.mu.Lock()
-		left, _ := op.MatchOrderLimit(order.Price, x)
+		left, matches = op.MatchOrderLimit(order.Price, x)
 		if left.IsPositive() {
 			my.AddOrder(order.Price, NewOrder(order.ID, left))
 		}
 		b.mu.Unlock()
-
-		order.ExecutedQuantity = order.OriginalQuantity.Sub(left)
-		b.database[order.ID] = order
 	default:
 		return ErrInvalidType
+	}
+
+	order.ExecutedQuantity = order.OriginalQuantity.Sub(left)
+
+	// Update order database.
+	b.database[order.ID] = order
+	for id, x := range matches {
+		maker, ok := b.database[id]
+		if !ok {
+			panic("illegal state")
+		}
+		maker.ExecutedQuantity = maker.ExecutedQuantity.Add(x)
+		b.database[maker.ID] = maker
+	}
+
+	if order.Type == TypeMarket && !order.OriginalQuantity.Sub(order.ExecutedQuantity).IsZero() {
+		return ErrMarketNotFullyExecuted
 	}
 
 	return nil
