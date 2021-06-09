@@ -104,11 +104,10 @@ func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) decimal.Dec
 }
 
 func (d *Ladder) MatchOrderMarket(taker Order) decimal.Decimal {
-	if d.heap.Len() > 0 {
-		for taker.Quantity.IsPositive() {
-			price := d.heap[0].Price
-			taker.Quantity = d.MatchOrderLimit(price, taker)
-		}
+	// While there is still quantity to be matched and the ladder is not empty.
+	for taker.Quantity.IsPositive() && d.heap.Len() > 0 {
+		price := d.heap[0].Price
+		taker.Quantity = d.MatchOrderLimit(price, taker)
 	}
 	return taker.Quantity
 }
