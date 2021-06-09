@@ -268,3 +268,72 @@ func TestBook_AddOrder_5(t *testing.T) {
 
 	assertExecutedQuantities(t, b, iq{"one", "1"}, iq{"two", "1"})
 }
+
+func TestBook_CancelOrder_1(t *testing.T) {
+	b := NewBook()
+	if err := b.CancelOrder(""); !errors.Is(err, ErrInvalidID) {
+		t.Error()
+	}
+	if err := b.CancelOrder("market"); !errors.Is(err, ErrOrderDoesNotExist) {
+		t.Error()
+	}
+	market := ClientOrder{
+		Side:             SideBuy,
+		OriginalQuantity: decimal.NewFromInt(3),
+		ExecutedQuantity: decimal.Zero,
+		ID:               "market",
+		Type:             TypeMarket,
+	}
+	if err := b.AddOrder(market); !errors.Is(err, ErrMarketNotFullyExecuted) {
+		t.Error()
+	}
+	if err := b.CancelOrder("market"); !errors.Is(err, ErrCannotCancelMarketOrder) {
+		t.Error()
+	}
+}
+
+// Cancel an unexecuted limit order.
+func TestBook_CancelOrder_2(t *testing.T) {
+	b := NewBook()
+	limit := ClientOrder{
+		Side:             SideBuy,
+		OriginalQuantity: decimal.NewFromInt(3),
+		ExecutedQuantity: decimal.Zero,
+		Price:            decimal.NewFromInt(10_000),
+		ID:               "limit",
+		Type:             TypeLimit,
+	}
+	b.AddOrder(limit)
+	assertCountLevels(t, b, 0, 1)
+	if err := b.CancelOrder("limit"); err != nil {
+		t.Error(err)
+	}
+	assertCountLevels(t, b, 0, 0)
+}
+
+// Cancel an executed order.
+func TestBook_CancelOrder_3(t *testing.T) {
+	b := NewBook()
+	limit := ClientOrder{
+		Side:             SideSell,
+		OriginalQuantity: decimal.NewFromInt(1),
+		ExecutedQuantity: decimal.Zero,
+		Price:            decimal.NewFromInt(10_000),
+		ID:               "limit",
+		Type:             TypeLimit,
+	}
+	market := ClientOrder{
+		Side:             SideBuy,
+		OriginalQuantity: decimal.NewFromInt(1),
+		ExecutedQuantity: decimal.Zero,
+		ID:               "market",
+		Type:             TypeMarket,
+	}
+	b.AddOrder(limit)
+	assertCountLevels(t, b, 1, 0)
+	b.AddOrder(market)
+	assertCountLevels(t, b, 0, 0)
+	if err := b.CancelOrder("limit"); !errors.Is(err, ErrCannotCancelOrder) {
+		t.Error(err)
+	}
+}
