@@ -71,6 +71,13 @@ func addOrder(writer http.ResponseWriter, request *http.Request) {
 		respond(writer, Response{Error: err.Error()})
 		return
 	}
+
+	// Return order's current status.
+	order, err = b.GetOrder(order.ID)
+	if err != nil {
+		respond(writer, Response{Error: err.Error()})
+		return
+	}
 	respond(writer, Response{Response: order})
 }
 

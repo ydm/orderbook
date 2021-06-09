@@ -26,13 +26,13 @@ var (
 type Book struct {
 	asks Ladder
 	bids Ladder
+	mu   sync.Mutex
 
 	// Imagine this is a database.
 	//
 	// TODO: TURN THIS INTO sync.Map!
-	database map[string]ClientOrder
-
-	mu sync.Mutex
+	database      map[string]ClientOrder
+	databaseMutex sync.Mutex
 }
 
 func NewBook() *Book {
@@ -56,7 +56,9 @@ func (b *Book) AddOrder(order ClientOrder) error {
 	}
 
 	// Check if order with this ID already exists.
+	b.databaseMutex.Lock()
 	_, ok := b.database[order.ID]
+	b.databaseMutex.Unlock()
 	if ok {
 		return ErrOrderExists
 	}
@@ -115,6 +117,7 @@ func (b *Book) AddOrder(order ClientOrder) error {
 	order.ExecutedQuantity = order.OriginalQuantity.Sub(left)
 
 	// Store the new order to our database.
+	b.databaseMutex.Lock()
 	b.database[order.ID] = order
 
 	// Update matched orders in our database.
@@ -126,6 +129,7 @@ func (b *Book) AddOrder(order ClientOrder) error {
 		maker.ExecutedQuantity = maker.ExecutedQuantity.Add(x)
 		b.database[maker.ID] = maker
 	}
+	b.databaseMutex.Unlock()
 
 	if order.Type == TypeMarket && !order.OriginalQuantity.Sub(order.ExecutedQuantity).IsZero() {
 		return ErrMarketNotFullyExecuted
@@ -140,7 +144,9 @@ func (b *Book) CancelOrder(id string) error {
 	}
 
 	// Check if order exists.
+	b.databaseMutex.Lock()
 	order, ok := b.database[id]
+	b.databaseMutex.Unlock()
 	if !ok {
 		return ErrOrderDoesNotExist
 	}
@@ -155,10 +161,14 @@ func (b *Book) CancelOrder(id string) error {
 	// Actually try to remove the order.
 	switch order.Side {
 	case SideBuy:
+		b.mu.Lock()
+		defer b.mu.Unlock()
 		if b.bids.RemoveOrder(order.Price, order.ID) {
 			return nil
 		}
 	case SideSell:
+		b.mu.Lock()
+		defer b.mu.Unlock()
 		if b.asks.RemoveOrder(order.Price, order.ID) {
 			return nil
 		}
@@ -171,7 +181,9 @@ func (b *Book) CancelOrder(id string) error {
 }
 
 func (b *Book) GetOrder(id string) (ClientOrder, error) {
+	b.databaseMutex.Lock()
 	order, ok := b.database[id]
+	b.databaseMutex.Unlock()
 	if !ok {
 		return order, ErrOrderDoesNotExist
 	}
