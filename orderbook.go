@@ -131,7 +131,7 @@ func (b *Book) AddOrder(order ClientOrder) error {
 	}
 	b.databaseMutex.Unlock()
 
-	if order.Type == TypeMarket && !order.OriginalQuantity.Sub(order.ExecutedQuantity).IsZero() {
+	if order.Type == TypeMarket && order.ExecutedQuantity.LessThan(order.OriginalQuantity) {
 		return ErrMarketNotFullyExecuted
 	}
 
