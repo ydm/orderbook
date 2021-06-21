@@ -14,6 +14,6 @@ Files
 ```
 orderbook
 ├── *.go    -- Order book implementation
-├── cmd     -- REST API server
+├── cmd     -- (Example) REST API server
 └── scripts -- REST API client scripts
 ```
