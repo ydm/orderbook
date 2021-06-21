@@ -7,6 +7,7 @@ import (
 )
 
 type Order struct {
+	// TODO: Turn ID into int64.
 	ID             string          // 16 bytes
 	Quantity       decimal.Decimal // 16 bytes
 	insertionIndex int             //  8 bytes

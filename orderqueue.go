@@ -32,7 +32,7 @@ type OrderQueue struct {
 
 	// indices maps an order ID to its insertion order index.
 	// This way removing by ID may use binarySearch() and thus
-	// take O(2logN + copy).
+	// take O(logN + copy).
 	indices map[string]int
 
 	next int
