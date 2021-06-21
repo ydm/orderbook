@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 
-	"orderbook"
+	"github.com/ydm/orderbook"
 
 	"github.com/gorilla/mux"
 )
