@@ -69,6 +69,7 @@ func TestLadder_RemoveOrder(t *testing.T) {
 
 	assertEq := func(have, want bool) {
 		t.Helper()
+
 		if have != want {
 			t.Error()
 		}
@@ -107,12 +108,15 @@ func TestLadder_MatchOrderLimit_1(t *testing.T) {
 		dec := decimal.NewFromInt(price)
 		key := orderbook.LevelMapKey(dec)
 		level, ok := d.Mapping[key]
+
 		if ok != present {
 			t.Errorf("have %t, want %t", ok, present)
 		}
+
 		if ok {
 			return level.Orders.Len()
 		}
+
 		return 0
 	}
 
@@ -130,6 +134,7 @@ func TestLadder_MatchOrderLimit_1(t *testing.T) {
 	if !left.IsZero() {
 		t.Errorf("have %v, want 0", left)
 	}
+
 	assertMatches(t, matches, map[string]string{"id2": "1", "id3": "2"})
 
 	if have := f(true, 10); have != 1 {
@@ -147,12 +152,15 @@ func TestLadder_MatchOrderLimit_2(t *testing.T) {
 		dec := decimal.NewFromInt(price)
 		key := orderbook.LevelMapKey(dec)
 		level, ok := d.Mapping[key]
+
 		if ok != present {
 			t.Errorf("have %t, want %t", ok, present)
 		}
+
 		if ok {
 			return level.Orders.Len()
 		}
+
 		return 0
 	}
 
@@ -187,12 +195,15 @@ func TestLadder_MatchOrderLimit_3(t *testing.T) {
 		dec := decimal.NewFromInt(price)
 		key := orderbook.LevelMapKey(dec)
 		level, ok := d.Mapping[key]
+
 		if ok != present {
 			t.Errorf("have %t, want %t", ok, present)
 		}
+
 		if ok {
 			return level.Orders.Len()
 		}
+
 		return 0
 	}
 
@@ -228,12 +239,15 @@ func TestLadder_MatchOrderMarket_1(t *testing.T) {
 		dec := decimal.NewFromInt(price)
 		key := orderbook.LevelMapKey(dec)
 		level, ok := d.Mapping[key]
+
 		if ok != present {
 			t.Errorf("have %t, want %t", ok, present)
 		}
+
 		if ok {
 			return level.Orders.Len()
 		}
+
 		return 0
 	}
 
@@ -263,15 +277,18 @@ func TestLadder_GetOrder(t *testing.T) {
 	if ok {
 		t.Error()
 	}
+
 	d.AddOrder(decimal.NewFromInt(9), orderbook.NewOrder("id1", decimal.NewFromInt(10)))
 
 	order, ok := d.GetOrder(decimal.NewFromInt(9), "id1")
 	if !ok {
 		t.Error()
 	}
+
 	if order.ID != "id1" {
 		t.Error()
 	}
+
 	if !order.Quantity.Equal(decimal.NewFromInt(10)) {
 		t.Error()
 	}

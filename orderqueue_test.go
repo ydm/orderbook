@@ -77,6 +77,7 @@ func TestOrderQueue_Remove(t *testing.T) {
 	t.Parallel()
 
 	const N = 1000
+
 	q := orderbook.NewOrderQueue(8)
 
 	for i := 0; i < N; i++ {
@@ -93,11 +94,15 @@ func TestOrderQueue_Remove(t *testing.T) {
 		if q.Len() != (N - i) {
 			t.Errorf("have %d, want %d", q.Len(), N-i)
 		}
-		s := strconv.Itoa(i)
+
 		popped := q.Remove()
-		if popped.ID != s || !popped.Quantity.Equal(decimal.NewFromInt(int64(i))) {
-			t.Errorf("have={%s %v}, want={%s, %s}", popped.ID, popped.Quantity, s, s)
+		wantedID := strconv.Itoa(i)
+		wantedQuantity := decimal.NewFromInt(int64(i))
+
+		if popped.ID != wantedID || !popped.Quantity.Equal(wantedQuantity) {
+			t.Errorf("have={%s %v}, want={%s, %s}", popped.ID, popped.Quantity, wantedID, wantedID)
 		}
+
 		if q.Len() != (N - i - 1) {
 			t.Errorf("have %d, want %d", q.Len(), N-i-1)
 		}

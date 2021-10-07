@@ -20,8 +20,10 @@ func TestLevelHeap_Walk(t *testing.T) {
 		heap.Push(&xs, orderbook.NewLevel(decimal.NewFromInt(3), levelType))
 
 		index := 0
+
 		xs.Walk(func(level *orderbook.Level) bool {
 			t.Helper()
+
 			if level.Price.String() != expected[index] {
 				t.Errorf("have %v, want %s", level.Price, expected[index])
 			}
