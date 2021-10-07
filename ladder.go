@@ -12,22 +12,22 @@ type Matches map[string]decimal.Decimal
 // Ladder keeps all price levels and their respective orders, allows
 // inspections and modifications.  It is either of type Ask or Bid.
 type Ladder struct {
-	mapping LevelMap  // Maps price to level.
-	heap    LevelHeap // Holds all levels in a convenient container.
+	Mapping LevelMap  // Maps price to level.
 	Type    int       // Ask or Bid.
+	heap    LevelHeap // Holds all levels in a convenient container.
 }
 
 func NewLadder(ladderType int) Ladder {
 	return Ladder{
-		mapping: make(LevelMap),
-		heap:    make(LevelHeap, 0, 256),
+		Mapping: make(LevelMap),
 		Type:    ladderType,
+		heap:    make(LevelHeap, 0, 256),
 	}
 }
 
 func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 	// First check if this level exists.
-	level, ok := d.mapping[levelMapKey(price)]
+	level, ok := d.Mapping[LevelMapKey(price)]
 	if ok {
 		// Add the order to this existing level.
 		return level.Orders.Add(o)
@@ -40,7 +40,7 @@ func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 	}
 
 	// Save the newly made level into our heap and mapping.
-	d.mapping[levelMapKey(price)] = level
+	d.Mapping[LevelMapKey(price)] = level
 	heap.Push(&d.heap, level)
 
 	return true
@@ -48,7 +48,7 @@ func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 
 func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 	// Check if this level exists.
-	level, ok := d.mapping[levelMapKey(price)]
+	level, ok := d.Mapping[LevelMapKey(price)]
 	if ok {
 		// Remove the order by its ID.
 		ans := level.Orders.RemoveByID(ID)
@@ -56,7 +56,7 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 		// If at this point the level is empty, remove it from
 		// this Ladder.
 		if level.Orders.Len() <= 0 {
-			delete(d.mapping, levelMapKey(price))
+			delete(d.Mapping, LevelMapKey(price))
 			if heap.Remove(&d.heap, level.index) == nil {
 				panic("illegal state")
 			}
@@ -70,7 +70,7 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 // MatchOrderLimit tries to match the given quantity at the given
 // price.  Returns the order quantity left unmatched.
 func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) (decimal.Decimal, Matches) {
-	level, ok := d.mapping[levelMapKey(price)]
+	level, ok := d.Mapping[LevelMapKey(price)]
 	matches := make(Matches)
 	if ok {
 		remove := make([]*Order, 0, 2)
@@ -121,7 +121,7 @@ func (d *Ladder) MatchOrderMarket(taker Order) (decimal.Decimal, Matches) {
 }
 
 func (d *Ladder) GetOrder(price decimal.Decimal, id string) (Order, bool) {
-	level, ok := d.mapping[levelMapKey(price)]
+	level, ok := d.Mapping[LevelMapKey(price)]
 	if ok {
 		return level.Orders.GetByID(id)
 	}
@@ -129,7 +129,7 @@ func (d *Ladder) GetOrder(price decimal.Decimal, id string) (Order, bool) {
 }
 
 func (d *Ladder) TotalQuantity(price decimal.Decimal) decimal.Decimal {
-	level, ok := d.mapping[levelMapKey(price)]
+	level, ok := d.Mapping[LevelMapKey(price)]
 	if ok {
 		return level.TotalQuantity()
 	}

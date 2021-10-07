@@ -135,6 +135,6 @@ func (h *LevelHeap) Pop() interface{} {
 // LevelMap maps Price to Level.
 type LevelMap map[int64]*Level
 
-func levelMapKey(d decimal.Decimal) int64 {
+func LevelMapKey(d decimal.Decimal) int64 {
 	return d.Mul(decimal.NewFromInt(1_0000_0000)).IntPart()
 }
