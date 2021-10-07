@@ -118,9 +118,8 @@ func (q *OrderQueue) Len() int {
 	// Len() also makes sure both of our data structures have the
 	// same length.
 	if len(q.queue) != len(q.indices) {
-		fmt.Printf("len(queue)=%d len(indices)=%d\n",
-			len(q.queue), len(q.indices))
-		panic("invariant")
+		msg := fmt.Sprintf("invariant: len(queue)=%d len(indices)=%d\n", len(q.queue), len(q.indices))
+		panic(msg)
 	}
 	return len(q.queue)
 }
