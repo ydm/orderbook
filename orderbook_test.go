@@ -1,4 +1,4 @@
-package orderbook
+package orderbook_test
 
 import (
 	"errors"
@@ -6,29 +6,30 @@ import (
 	"testing"
 
 	"github.com/shopspring/decimal"
+	"github.com/ydm/orderbook"
 )
 
-func assertCountLevels(t *testing.T, b *Book, asks, bids int) {
+func assertCountLevels(t *testing.T, b *orderbook.Book, asks, bids int) {
 	t.Helper()
 
-	if have := b.asks.heap.CountLevels(); have != asks {
+	if have := b.Asks.Heap.CountLevels(); have != asks {
 		t.Errorf("have %d, want %d", have, asks)
 	}
 
-	if have := b.bids.heap.CountLevels(); have != bids {
+	if have := b.Bids.Heap.CountLevels(); have != bids {
 		t.Errorf("have %d, want %d", have, bids)
 	}
 }
 
 type pq struct{ price, quantity string }
 
-func assertLevels(t *testing.T, ladder *Ladder, xs ...pq) {
+func assertLevels(t *testing.T, ladder *orderbook.Ladder, xs ...pq) {
 	t.Helper()
 
-	ladder.Walk(func(level *Level) bool {
+	ladder.Walk(func(level *orderbook.Level) bool {
 		t.Helper()
 
-		if len(xs) <= 0 {
+		if len(xs) == 0 {
 			t.Errorf("unexpected level at price %v", level.Price)
 		}
 		x := xs[0]
@@ -56,7 +57,7 @@ func assertLevels(t *testing.T, ladder *Ladder, xs ...pq) {
 
 type iq struct{ id, quantity string }
 
-func assertExecutedQuantities(t *testing.T, b *Book, xs ...iq) {
+func assertExecutedQuantities(t *testing.T, b *orderbook.Book, xs ...iq) {
 	t.Helper()
 
 	for _, x := range xs {
@@ -78,15 +79,18 @@ func assertExecutedQuantities(t *testing.T, b *Book, xs ...iq) {
 
 // Submit a market order against an empty order book.
 func TestBook_AddOrder_1(t *testing.T) {
-	b := NewBook()
+	t.Parallel()
+
+	b := orderbook.NewBook()
 	assertCountLevels(t, b, 0, 0)
 
-	order := ClientOrder{
-		Side:             SideBuy,
+	order := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(1),
 		ExecutedQuantity: decimal.Zero,
+		Price:            decimal.Zero,
 		ID:               "id1",
-		Type:             TypeMarket,
+		Type:             orderbook.TypeMarket,
 	}
 
 	// Make sure market orders do not end up in the order book, but rather get matched
@@ -96,7 +100,7 @@ func TestBook_AddOrder_1(t *testing.T) {
 
 	// Since the book is empty, the error returned should notify of incomplete
 	// execution.
-	if !errors.Is(err, ErrMarketNotFullyExecuted) {
+	if !errors.Is(err, orderbook.ErrMarketNotFullyExecuted) {
 		t.Error()
 	}
 
@@ -109,21 +113,24 @@ func TestBook_AddOrder_1(t *testing.T) {
 // limit order covers the market order and thus the later gets executed immediately.  The
 // limit order from the book is partially executed.
 func TestBook_AddOrder_2(t *testing.T) {
-	b := NewBook()
-	limit := ClientOrder{
-		Side:             SideSell,
+	t.Parallel()
+
+	b := orderbook.NewBook()
+	limit := orderbook.ClientOrder{
+		Side:             orderbook.SideSell,
 		OriginalQuantity: decimal.NewFromInt(2),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_000),
 		ID:               "limit",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
-	market := ClientOrder{
-		Side:             SideBuy,
+	market := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(1),
 		ExecutedQuantity: decimal.Zero,
+		Price:            decimal.Zero,
 		ID:               "market",
-		Type:             TypeMarket,
+		Type:             orderbook.TypeMarket,
 	}
 
 	// Make sure limit orders get added to the order book.
@@ -131,14 +138,14 @@ func TestBook_AddOrder_2(t *testing.T) {
 		t.Error(err)
 	}
 	assertCountLevels(t, b, 1, 0)
-	assertLevels(t, &b.asks, pq{"10000", "2"})
+	assertLevels(t, &b.Asks, pq{"10000", "2"})
 
 	// Make sure the same order cannot be submitted twice.
-	if err := b.AddOrder(limit); !errors.Is(err, ErrOrderExists) {
+	if err := b.AddOrder(limit); !errors.Is(err, orderbook.ErrOrderExists) {
 		t.Error()
 	}
 	assertCountLevels(t, b, 1, 0)
-	assertLevels(t, &b.asks, pq{"10000", "2"})
+	assertLevels(t, &b.Asks, pq{"10000", "2"})
 
 	// Make sure this market gets matched and what's left in the order book is the
 	// partially executed limit order.
@@ -146,29 +153,35 @@ func TestBook_AddOrder_2(t *testing.T) {
 		t.Error(err)
 	}
 	assertCountLevels(t, b, 1, 0)
-	assertLevels(t, &b.asks, pq{"10000", "1"})
+	assertLevels(t, &b.Asks, pq{"10000", "1"})
 }
 
 // Submit a market order and match it against a limit order from the order book.  The
 // market order covers the limit order.
 func TestBook_AddOrder_3(t *testing.T) {
-	b := NewBook()
-	limit := ClientOrder{
-		Side:             SideSell,
+	t.Parallel()
+
+	b := orderbook.NewBook()
+	limit := orderbook.ClientOrder{
+		Side:             orderbook.SideSell,
 		OriginalQuantity: decimal.NewFromInt(1),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_000),
 		ID:               "limit",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
-	b.AddOrder(limit)
 
-	market := ClientOrder{
-		Side:             SideBuy,
+	if err := b.AddOrder(limit); err != nil {
+		t.Error(err)
+	}
+
+	market := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(3),
 		ExecutedQuantity: decimal.Zero,
+		Price:            decimal.Zero,
 		ID:               "market",
-		Type:             TypeMarket,
+		Type:             orderbook.TypeMarket,
 	}
 	err := b.AddOrder(market)
 
@@ -176,7 +189,7 @@ func TestBook_AddOrder_3(t *testing.T) {
 	assertCountLevels(t, b, 0, 0)
 
 	// Make sure the market order didn't execute fully.
-	if !errors.Is(err, ErrMarketNotFullyExecuted) {
+	if !errors.Is(err, orderbook.ErrMarketNotFullyExecuted) {
 		t.Error()
 	}
 
@@ -187,27 +200,29 @@ func TestBook_AddOrder_3(t *testing.T) {
 
 // Add two limit orders that do not touch each other's prices.
 func TestBook_AddOrder_4(t *testing.T) {
-	b := NewBook()
-	sell := ClientOrder{
-		Side:             SideSell,
+	t.Parallel()
+
+	b := orderbook.NewBook()
+	sell := orderbook.ClientOrder{
+		Side:             orderbook.SideSell,
 		OriginalQuantity: decimal.NewFromInt(1),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_001),
 		ID:               "one",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
 	if err := b.AddOrder(sell); err != nil {
 		t.Error(err)
 	}
 	assertCountLevels(t, b, 1, 0)
 
-	buy := ClientOrder{
-		Side:             SideBuy,
+	buy := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(3),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_000),
 		ID:               "two",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
 	if err := b.AddOrder(buy); err != nil {
 		t.Error(err)
@@ -218,73 +233,84 @@ func TestBook_AddOrder_4(t *testing.T) {
 
 // Match a limit order with another limit order.
 func TestBook_AddOrder_5(t *testing.T) {
-	b := NewBook()
-	sell := ClientOrder{
-		Side:             SideSell,
+	t.Parallel()
+
+	b := orderbook.NewBook()
+	sell := orderbook.ClientOrder{
+		Side:             orderbook.SideSell,
 		OriginalQuantity: decimal.NewFromInt(1),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_000),
 		ID:               "one",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
 	if err := b.AddOrder(sell); err != nil {
 		t.Error(err)
 	}
 	assertCountLevels(t, b, 1, 0)
-	assertLevels(t, &b.asks, pq{"10000", "1"})
+	assertLevels(t, &b.Asks, pq{"10000", "1"})
 
-	buy := ClientOrder{
-		Side:             SideBuy,
+	buy := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(3),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_000),
 		ID:               "two",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
 	if err := b.AddOrder(buy); err != nil {
 		t.Error(err)
 	}
 	assertCountLevels(t, b, 0, 1)
-	assertLevels(t, &b.bids, pq{"10000", "2"})
+	assertLevels(t, &b.Bids, pq{"10000", "2"})
 
 	assertExecutedQuantities(t, b, iq{"one", "1"}, iq{"two", "1"})
 }
 
 func TestBook_CancelOrder_1(t *testing.T) {
-	b := NewBook()
-	if err := b.CancelOrder(""); !errors.Is(err, ErrInvalidID) {
+	t.Parallel()
+
+	b := orderbook.NewBook()
+	if err := b.CancelOrder(""); !errors.Is(err, orderbook.ErrInvalidID) {
 		t.Error()
 	}
-	if err := b.CancelOrder("market"); !errors.Is(err, ErrOrderDoesNotExist) {
+	if err := b.CancelOrder("market"); !errors.Is(err, orderbook.ErrOrderDoesNotExist) {
 		t.Error()
 	}
-	market := ClientOrder{
-		Side:             SideBuy,
+
+	market := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(3),
 		ExecutedQuantity: decimal.Zero,
+		Price:            decimal.Zero,
 		ID:               "market",
-		Type:             TypeMarket,
+		Type:             orderbook.TypeMarket,
 	}
-	if err := b.AddOrder(market); !errors.Is(err, ErrMarketNotFullyExecuted) {
+	if err := b.AddOrder(market); !errors.Is(err, orderbook.ErrMarketNotFullyExecuted) {
 		t.Error()
 	}
-	if err := b.CancelOrder("market"); !errors.Is(err, ErrCannotCancelMarketOrder) {
+	if err := b.CancelOrder("market"); !errors.Is(err, orderbook.ErrCannotCancelMarketOrder) {
 		t.Error()
 	}
 }
 
 // Cancel an unexecuted limit order.
 func TestBook_CancelOrder_2(t *testing.T) {
-	b := NewBook()
-	limit := ClientOrder{
-		Side:             SideBuy,
+	t.Parallel()
+
+	b := orderbook.NewBook()
+	limit := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(3),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_000),
 		ID:               "limit",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
-	b.AddOrder(limit)
+
+	if err := b.AddOrder(limit); err != nil {
+		t.Error(err)
+	}
 	assertCountLevels(t, b, 0, 1)
 	if err := b.CancelOrder("limit"); err != nil {
 		t.Error(err)
@@ -294,50 +320,66 @@ func TestBook_CancelOrder_2(t *testing.T) {
 
 // Cancel an executed order.
 func TestBook_CancelOrder_3(t *testing.T) {
-	b := NewBook()
-	limit := ClientOrder{
-		Side:             SideSell,
+	t.Parallel()
+
+	b := orderbook.NewBook()
+	limit := orderbook.ClientOrder{
+		Side:             orderbook.SideSell,
 		OriginalQuantity: decimal.NewFromInt(1),
 		ExecutedQuantity: decimal.Zero,
 		Price:            decimal.NewFromInt(10_000),
 		ID:               "limit",
-		Type:             TypeLimit,
+		Type:             orderbook.TypeLimit,
 	}
-	market := ClientOrder{
-		Side:             SideBuy,
+	market := orderbook.ClientOrder{
+		Side:             orderbook.SideBuy,
 		OriginalQuantity: decimal.NewFromInt(1),
 		ExecutedQuantity: decimal.Zero,
+		Price:            decimal.Zero,
 		ID:               "market",
-		Type:             TypeMarket,
+		Type:             orderbook.TypeMarket,
 	}
-	b.AddOrder(limit)
+	if err := b.AddOrder(limit); err != nil {
+		t.Error(err)
+	}
+
 	assertCountLevels(t, b, 1, 0)
-	b.AddOrder(market)
+	if err := b.AddOrder(market); err != nil {
+		t.Error(err)
+	}
+
 	assertCountLevels(t, b, 0, 0)
-	if err := b.CancelOrder("limit"); !errors.Is(err, ErrCannotCancelOrder) {
+	if err := b.CancelOrder("limit"); !errors.Is(err, orderbook.ErrCannotCancelOrder) {
 		t.Error(err)
 	}
 }
 
+//nolint:cyclop,funlen
 func TestBook_GetSnapshot(t *testing.T) {
-	b := NewBook()
+	t.Parallel()
+
+	b := orderbook.NewBook()
+
 	for price := 11; price <= 30; price++ {
 		for i := 0; i < price; i++ {
-			order := ClientOrder{
-				Side:             SideBuy,
+			order := orderbook.ClientOrder{
+				Side:             orderbook.SideBuy,
 				OriginalQuantity: decimal.NewFromInt(int64(2 * price)),
 				ExecutedQuantity: decimal.Zero,
 				Price:            decimal.NewFromInt(int64(price)),
 				ID:               fmt.Sprintf("%d_%d", price, i),
-				Type:             TypeLimit,
+				Type:             orderbook.TypeLimit,
 			}
 			if price >= 21 {
-				order.Side = SideSell
+				order.Side = orderbook.SideSell
 			}
-			b.AddOrder(order)
+			if err := b.AddOrder(order); err != nil {
+				t.Error(err)
+			}
 		}
 	}
-	var snapshot Snapshot
+
+	var snapshot orderbook.Snapshot
 
 	snapshot = b.GetSnapshot(0)
 	if len(snapshot.Asks) != 0 || len(snapshot.Bids) != 0 {
@@ -354,7 +396,7 @@ func TestBook_GetSnapshot(t *testing.T) {
 		t.Error()
 	}
 
-	assertEq := func(level ClientLevel, price int64) {
+	assertEq := func(level orderbook.ClientLevel, price int64) {
 		t.Helper()
 		if !level.Price.Equal(decimal.NewFromInt(price)) {
 			t.Errorf("have price %v, want price %d", level.Price, price)

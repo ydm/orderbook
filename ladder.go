@@ -12,16 +12,16 @@ type Matches map[string]decimal.Decimal
 // Ladder keeps all price levels and their respective orders, allows
 // inspections and modifications.  It is either of type Ask or Bid.
 type Ladder struct {
+	Heap    LevelHeap // Holds all levels in a convenient container.
 	Mapping LevelMap  // Maps price to level.
 	Type    int       // Ask or Bid.
-	heap    LevelHeap // Holds all levels in a convenient container.
 }
 
 func NewLadder(ladderType int) Ladder {
 	return Ladder{
+		Heap:    make(LevelHeap, 0, 256),
 		Mapping: make(LevelMap),
 		Type:    ladderType,
-		heap:    make(LevelHeap, 0, 256),
 	}
 }
 
@@ -41,7 +41,7 @@ func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 
 	// Save the newly made level into our heap and mapping.
 	d.Mapping[LevelMapKey(price)] = level
-	heap.Push(&d.heap, level)
+	heap.Push(&d.Heap, level)
 
 	return true
 }
@@ -57,7 +57,7 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 		// this Ladder.
 		if level.Orders.Len() <= 0 {
 			delete(d.Mapping, LevelMapKey(price))
-			if heap.Remove(&d.heap, level.index) == nil {
+			if heap.Remove(&d.Heap, level.index) == nil {
 				panic("illegal state")
 			}
 		}
@@ -109,8 +109,8 @@ func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) (decimal.De
 func (d *Ladder) MatchOrderMarket(taker Order) (decimal.Decimal, Matches) {
 	matches := make(Matches)
 	// While there is still quantity to be matched and the ladder is not empty.
-	for taker.Quantity.IsPositive() && d.heap.Len() > 0 {
-		price := d.heap[0].Price
+	for taker.Quantity.IsPositive() && d.Heap.Len() > 0 {
+		price := d.Heap[0].Price
 		q, xs := d.MatchOrderLimit(price, taker)
 		taker.Quantity = q
 		for k, v := range xs {
@@ -137,9 +137,9 @@ func (d *Ladder) TotalQuantity(price decimal.Decimal) decimal.Decimal {
 }
 
 func (d *Ladder) Walk(f func(level *Level) bool) {
-	d.heap.Walk(f)
+	d.Heap.Walk(f)
 }
 
 func (d *Ladder) String() string {
-	return d.heap.String()
+	return d.Heap.String()
 }

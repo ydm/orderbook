@@ -24,8 +24,8 @@ var (
 )
 
 type Book struct {
-	asks Ladder
-	bids Ladder
+	Asks Ladder
+	Bids Ladder
 	mu   sync.Mutex
 
 	// Imagine this is a database.
@@ -37,8 +37,8 @@ type Book struct {
 
 func NewBook() *Book {
 	return &Book{
-		asks:     NewLadder(Ask),
-		bids:     NewLadder(Bid),
+		Asks:     NewLadder(Ask),
+		Bids:     NewLadder(Bid),
 		database: make(map[string]ClientOrder),
 	}
 }
@@ -69,11 +69,11 @@ func (b *Book) AddOrder(order ClientOrder) error {
 	var my, op *Ladder
 	switch order.Side {
 	case SideBuy:
-		my = &b.bids
-		op = &b.asks
+		my = &b.Bids
+		op = &b.Asks
 	case SideSell:
-		my = &b.asks
-		op = &b.bids
+		my = &b.Asks
+		op = &b.Bids
 	default:
 		return ErrInvalidSide
 	}
@@ -163,13 +163,13 @@ func (b *Book) CancelOrder(id string) error {
 	case SideBuy:
 		b.mu.Lock()
 		defer b.mu.Unlock()
-		if b.bids.RemoveOrder(order.Price, order.ID) {
+		if b.Bids.RemoveOrder(order.Price, order.ID) {
 			return nil
 		}
 	case SideSell:
 		b.mu.Lock()
 		defer b.mu.Unlock()
-		if b.asks.RemoveOrder(order.Price, order.ID) {
+		if b.Asks.RemoveOrder(order.Price, order.ID) {
 			return nil
 		}
 	default:
@@ -225,8 +225,8 @@ func (b *Book) GetSnapshot(depth int) Snapshot {
 	}
 
 	b.mu.Lock()
-	b.asks.Walk(ask)
-	b.bids.Walk(bid)
+	b.Asks.Walk(ask)
+	b.Bids.Walk(bid)
 	b.mu.Unlock()
 	return ans
 }
