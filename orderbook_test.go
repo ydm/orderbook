@@ -76,26 +76,6 @@ func assertExecutedQuantities(t *testing.T, b *Book, xs ...iq) {
 	}
 }
 
-func assertQuantities(t *testing.T, ladder *Ladder, xs ...int64) {
-	t.Helper()
-
-	ladder.Walk(func(level *Level) bool {
-		t.Helper()
-
-		if len(xs) <= 0 {
-			t.Errorf("unexpected level at price %v", level.Price)
-		}
-		x := xs[0]
-		xs = xs[1:]
-
-		if !level.Price.Equal(decimal.NewFromInt(x)) {
-			t.Errorf("have %v, want %d", level.Price, x)
-		}
-
-		return true
-	})
-}
-
 // Submit a market order against an empty order book.
 func TestBook_AddOrder_1(t *testing.T) {
 	b := NewBook()
