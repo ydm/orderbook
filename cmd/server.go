@@ -10,9 +10,8 @@ import (
 	"os/signal"
 	"strconv"
 
-	"github.com/ydm/orderbook"
-
 	"github.com/gorilla/mux"
+	"github.com/ydm/orderbook"
 )
 
 type BookKeyType int
@@ -37,10 +36,15 @@ func Interrupt(ctx context.Context) bool {
 	}
 }
 
+//nolint:forbidigo
+func logf(format string, a ...interface{}) {
+	fmt.Printf(format, a...)
+}
+
 func respond(w http.ResponseWriter, r Response) {
 	encoded, err := json.Marshal(r)
 	if err != nil {
-		fmt.Printf("WRN Error while encoding response: %v\n", err)
+		logf("WRN: Error while encoding response: %v\n", err)
 		w.WriteHeader(500)
 	} else {
 		fmt.Fprint(w, string(encoded))
@@ -54,31 +58,34 @@ func respond(w http.ResponseWriter, r Response) {
 func addOrder(writer http.ResponseWriter, request *http.Request) {
 	body, err := ioutil.ReadAll(request.Body)
 	if err != nil {
-		respond(writer, Response{Error: err.Error()})
+		respond(writer, Response{Response: nil, Error: err.Error()})
 		return
 	}
 
 	var order orderbook.ClientOrder
-	err = json.Unmarshal(body, &order)
-	if err != nil {
-		respond(writer, Response{Error: err.Error()})
+	if err := json.Unmarshal(body, &order); err != nil {
+		respond(writer, Response{Response: nil, Error: err.Error()})
 		return
 	}
 
-	b := request.Context().Value(BookKey).(*orderbook.Book)
-	err = b.AddOrder(order)
-	if err != nil {
-		respond(writer, Response{Error: err.Error()})
+	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
+	if !ok {
+		panic("")
+	}
+
+	if err := b.AddOrder(order); err != nil {
+		respond(writer, Response{Response: nil, Error: err.Error()})
 		return
 	}
 
 	// Return order's current status.
 	order, err = b.GetOrder(order.ID)
 	if err != nil {
-		respond(writer, Response{Error: err.Error()})
+		respond(writer, Response{Response: nil, Error: err.Error()})
 		return
 	}
-	respond(writer, Response{Response: order})
+
+	respond(writer, Response{Response: order, Error: ""})
 }
 
 // +------------------+
@@ -89,12 +96,15 @@ func cancelOrder(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	b := request.Context().Value(BookKey).(*orderbook.Book)
-	err := b.CancelOrder(id)
-	if err == nil {
-		respond(writer, Response{Response: true})
+	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
+	if !ok {
+		panic("")
+	}
+
+	if err := b.CancelOrder(id); err == nil {
+		respond(writer, Response{Response: true, Error: ""})
 	} else {
-		respond(writer, Response{Error: err.Error()})
+		respond(writer, Response{Response: false, Error: err.Error()})
 	}
 }
 
@@ -106,13 +116,16 @@ func queryOrder(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	id := vars["id"]
 
-	b := request.Context().Value(BookKey).(*orderbook.Book)
-	order, err := b.GetOrder(id)
-	if err != nil {
-		respond(writer, Response{Error: err.Error()})
-		return
+	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
+	if !ok {
+		panic("")
 	}
-	respond(writer, Response{Response: order})
+
+	if order, err := b.GetOrder(id); err != nil {
+		respond(writer, Response{Response: nil, Error: err.Error()})
+	} else {
+		respond(writer, Response{Response: order, Error: ""})
+	}
 }
 
 // +-------------------------+
@@ -130,24 +143,32 @@ func book(writer http.ResponseWriter, request *http.Request) {
 	if !ok {
 		depths = []string{"20"}
 	}
+
 	depth, err := strconv.Atoi(depths[len(depths)-1])
 	if err != nil {
 		depth = 20
 	}
 
-	b := request.Context().Value(BookKey).(*orderbook.Book)
+	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
+	if !ok {
+		panic("")
+	}
+
 	snapshot := b.GetSnapshot(depth)
+
 	respond(writer, Response{
 		Response: bookResponse{
 			Asks: snapshot.Asks,
 			Bids: snapshot.Bids,
 		},
+		Error: "",
 	})
 }
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	go func() {
 		if Interrupt(ctx) {
 			cancel()
@@ -167,13 +188,24 @@ func main() {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-	server := &http.Server{Addr: ":7701", Handler: f(router)}
+
+	var server http.Server
+	server.Addr = ":7701"
+	server.Handler = f(router)
+
 	go func() {
-		fmt.Printf("Starting server at port 7701...\n")
-		server.ListenAndServe()
+		logf("INF: Starting server at port 7701...\n")
+
+		if err := server.ListenAndServe(); err != nil {
+			panic(err)
+		}
 	}()
 
 	<-ctx.Done()
-	fmt.Printf("Shutting down...\n")
-	server.Shutdown(context.Background())
+
+	logf("INF: Shutting down...\n")
+
+	if err := server.Shutdown(context.Background()); err != nil {
+		panic(err)
+	}
 }
