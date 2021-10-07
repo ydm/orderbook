@@ -5,19 +5,19 @@ import (
 	"strings"
 )
 
-// binarySearch returns index of the search key, if it is contained in
+// BinarySearch returns index of the search key, if it is contained in
 // the array, otherwise (-(insertion point) – 1).
-func binarySearch(xs []*Order, x int) int {
+func BinarySearch(xs []*Order, x int) int {
 	low, high := 0, len(xs)
 	for low < high {
 		mid := low + (high-low)/2
-		if xs[mid].insertionIndex < x {
+		if xs[mid].InsertionIndex < x {
 			low = mid + 1
 		} else {
 			high = mid
 		}
 	}
-	if low < len(xs) && xs[low].insertionIndex == x {
+	if low < len(xs) && xs[low].InsertionIndex == x {
 		return low
 	} else {
 		return -low - 1
@@ -54,7 +54,7 @@ func (q *OrderQueue) Add(order Order) bool {
 
 	// Set insertionIndex to order and also save it to our
 	// ID -> insertionIndex mapping.
-	order.insertionIndex = q.next
+	order.InsertionIndex = q.next
 	q.indices[order.ID] = q.next
 	q.next++
 
@@ -82,7 +82,7 @@ func (q *OrderQueue) RemoveByID(orderID string) bool {
 	insertionIndex, ok := q.indices[orderID]
 	if ok {
 		// If yes, locate its index in the queue.
-		i := binarySearch(q.queue, insertionIndex)
+		i := BinarySearch(q.queue, insertionIndex)
 		if i >= 0 {
 			order := q.queue[i]
 
@@ -101,7 +101,7 @@ func (q *OrderQueue) RemoveByID(orderID string) bool {
 func (q *OrderQueue) GetByID(orderID string) (Order, bool) {
 	insertionIndex, ok := q.indices[orderID]
 	if ok {
-		i := binarySearch(q.queue, insertionIndex)
+		i := BinarySearch(q.queue, insertionIndex)
 		if i >= 0 {
 			order := q.queue[i]
 			return *order, true

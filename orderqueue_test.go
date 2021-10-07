@@ -1,13 +1,16 @@
-package orderbook
+package orderbook_test
 
 import (
 	"strconv"
 	"testing"
 
 	"github.com/shopspring/decimal"
+	"github.com/ydm/orderbook"
 )
 
 func TestBinarySearch(t *testing.T) {
+	t.Parallel()
+
 	assertEq := func(have, want int) {
 		t.Helper()
 		if have != want {
@@ -15,39 +18,44 @@ func TestBinarySearch(t *testing.T) {
 		}
 	}
 	xs := []int{1, 3, 6, 10, 15, 21, 28, 36, 45, 55}
-	ys := make([]*Order, len(xs))
+	ys := make([]*orderbook.Order, len(xs))
+
 	for i, x := range xs {
-		order := NewOrder(strconv.Itoa(i), decimal.NewFromInt(1))
+		order := orderbook.NewOrder(strconv.Itoa(i), decimal.NewFromInt(1))
 		ys[i] = &order
-		ys[i].insertionIndex = x
+		ys[i].InsertionIndex = x
 	}
-	assertEq(binarySearch(ys, 1), 0)
-	assertEq(binarySearch(ys, 3), 1)
-	assertEq(binarySearch(ys, 10), 3)
-	assertEq(binarySearch(ys, 45), 8)
-	assertEq(binarySearch(ys, 55), 9)
-	assertEq(binarySearch(ys, -1), -1)
-	assertEq(binarySearch(ys, 2), -2)
-	assertEq(binarySearch(ys, 50), -10)
-	assertEq(binarySearch(ys, 60), -11)
+	assertEq(orderbook.BinarySearch(ys, 1), 0)
+	assertEq(orderbook.BinarySearch(ys, 3), 1)
+	assertEq(orderbook.BinarySearch(ys, 10), 3)
+	assertEq(orderbook.BinarySearch(ys, 45), 8)
+	assertEq(orderbook.BinarySearch(ys, 55), 9)
+	assertEq(orderbook.BinarySearch(ys, -1), -1)
+	assertEq(orderbook.BinarySearch(ys, 2), -2)
+	assertEq(orderbook.BinarySearch(ys, 50), -10)
+	assertEq(orderbook.BinarySearch(ys, 60), -11)
 }
 
 func TestOrderQueue(t *testing.T) {
-	q := NewOrderQueue(2)
+	t.Parallel()
+
+	q := orderbook.NewOrderQueue(2)
 	if q.Len() != 0 {
 		t.Fail()
 	}
 
-	inp := Order{
-		Quantity: decimal.NewFromInt(1),
-		ID:       "7bfa0e20",
+	inp := orderbook.Order{
+		ID:             "7bfa0e20",
+		Quantity:       decimal.NewFromInt(1),
+		InsertionIndex: 0,
 	}
 	q.Add(inp)
 	if q.Len() != 1 {
 		t.Errorf("have %d, want 1", q.Len())
 	}
 
-	out := q.Remove()
+	out := q.Remove() //nolint:ifshort
+
 	if q.Len() != 0 {
 		t.Errorf("have %d, want 0", q.Len())
 	}
@@ -66,14 +74,17 @@ func TestOrderQueue(t *testing.T) {
 }
 
 func TestOrderQueue_Remove(t *testing.T) {
-	const N = 1000
+	t.Parallel()
 
-	q := NewOrderQueue(8)
+	const N = 1000
+	q := orderbook.NewOrderQueue(8)
+
 	for i := 0; i < N; i++ {
 		s := strconv.Itoa(i)
-		o := Order{
-			Quantity: decimal.NewFromInt(int64(i)),
-			ID:       s,
+		o := orderbook.Order{
+			ID:             s,
+			Quantity:       decimal.NewFromInt(int64(i)),
+			InsertionIndex: 0,
 		}
 		q.Add(o)
 	}
@@ -94,13 +105,16 @@ func TestOrderQueue_Remove(t *testing.T) {
 }
 
 func TestOrderQueue_RemoveByID(t *testing.T) {
-	q := NewOrderQueue(2)
+	t.Parallel()
+
+	q := orderbook.NewOrderQueue(2)
 
 	for i := 0; i < 1000; i++ {
 		s := strconv.Itoa(i)
-		o := Order{
-			Quantity: decimal.NewFromInt(int64(i)),
-			ID:       s,
+		o := orderbook.Order{
+			ID:             s,
+			Quantity:       decimal.NewFromInt(int64(i)),
+			InsertionIndex: 0,
 		}
 		q.Add(o)
 	}
