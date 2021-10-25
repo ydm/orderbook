@@ -60,6 +60,7 @@ func TestLadder_Walk_1(t *testing.T) {
 			t.Errorf("have %v, want %s", level.Price, expected[index])
 		}
 		index++
+
 		return true
 	})
 }
@@ -94,6 +95,7 @@ func TestLadder_RemoveOrder(t *testing.T) {
 			t.Errorf("have %v, want %s", level.Price, expected[index])
 		}
 		index++
+
 		return true
 	})
 }
@@ -175,9 +177,11 @@ func TestLadder_MatchOrderLimit_2(t *testing.T) {
 	}
 
 	left, matches := d.MatchOrderLimit(decimal.NewFromInt(10), orderbook.NewOrder("id6", decimal.NewFromInt(10)))
+
 	if !left.Equal(decimal.NewFromInt(4)) {
 		t.Errorf("have %v, want 4", left)
 	}
+
 	assertMatches(t, matches, map[string]string{"id2": "1", "id3": "2", "id4": "3"})
 
 	if have := f(false, 10); have != 0 {
@@ -221,6 +225,7 @@ func TestLadder_MatchOrderLimit_3(t *testing.T) {
 	if !left.Equal(decimal.Zero) {
 		t.Errorf("have %v, want 0", left)
 	}
+
 	assertMatches(t, matches, map[string]string{"id2": "1", "id3": "1"})
 	// fmt.Printf("%v\n", d.heap)
 
@@ -261,6 +266,7 @@ func TestLadder_MatchOrderMarket_1(t *testing.T) {
 	if !left.Equal(decimal.Zero) {
 		t.Errorf("have %v, want 0", left)
 	}
+
 	assertMatches(t, matches, map[string]string{"id1": "10", "id2": "1", "id3": "2", "id4": "3", "id5": "4"})
 
 	if f(false, 9) != 0 || f(false, 10) != 0 || f(true, 11) != 1 {

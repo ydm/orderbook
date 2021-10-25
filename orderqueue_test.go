@@ -13,10 +13,12 @@ func TestBinarySearch(t *testing.T) {
 
 	assertEq := func(have, want int) {
 		t.Helper()
+
 		if have != want {
 			t.Errorf("have %d, want %d", have, want)
 		}
 	}
+
 	xs := []int{1, 3, 6, 10, 15, 21, 28, 36, 45, 55}
 	ys := make([]*orderbook.Order, len(xs))
 
@@ -25,6 +27,7 @@ func TestBinarySearch(t *testing.T) {
 		ys[i] = &order
 		ys[i].InsertionIndex = x
 	}
+
 	assertEq(orderbook.BinarySearch(ys, 1), 0)
 	assertEq(orderbook.BinarySearch(ys, 3), 1)
 	assertEq(orderbook.BinarySearch(ys, 10), 3)
@@ -49,7 +52,9 @@ func TestOrderQueue(t *testing.T) {
 		Quantity:       decimal.NewFromInt(1),
 		InsertionIndex: 0,
 	}
+
 	q.Add(inp)
+
 	if q.Len() != 1 {
 		t.Errorf("have %d, want 1", q.Len())
 	}
@@ -67,6 +72,7 @@ func TestOrderQueue(t *testing.T) {
 	// Make sure an order with the same ID cannot be submitted more than once.
 	for i := 1; i <= 16; i++ {
 		q.Add(inp)
+
 		if q.Len() != 1 {
 			t.Errorf("have %d, want 1", q.Len())
 		}
@@ -127,15 +133,19 @@ func TestOrderQueue_RemoveByID(t *testing.T) {
 	if q.Len() != 1000 {
 		t.Fail()
 	}
+
 	if q.RemoveByID("nonexistent") {
 		t.Fail()
 	}
+
 	if !q.RemoveByID("681") {
 		t.Fail()
 	}
+
 	if q.RemoveByID("681") {
 		t.Fail()
 	}
+
 	if q.Len() != 999 {
 		t.Fail()
 	}

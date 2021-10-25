@@ -46,17 +46,18 @@ func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
 	return true
 }
 
-func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
+func (d *Ladder) RemoveOrder(price decimal.Decimal, id string) bool {
 	// Check if this level exists.
 	level, ok := d.Mapping[LevelMapKey(price)]
 	if ok {
 		// Remove the order by its ID.
-		ans := level.Orders.RemoveByID(ID)
+		ans := level.Orders.RemoveByID(id)
 
 		// If at this point the level is empty, remove it from
 		// this Ladder.
 		if level.Orders.Len() <= 0 {
 			delete(d.Mapping, LevelMapKey(price))
+
 			if heap.Remove(&d.Heap, level.index) == nil {
 				panic("illegal state")
 			}
@@ -64,6 +65,7 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 
 		return ans
 	}
+
 	return false
 }
 
@@ -72,8 +74,10 @@ func (d *Ladder) RemoveOrder(price decimal.Decimal, ID string) bool {
 func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) (decimal.Decimal, Matches) {
 	level, ok := d.Mapping[LevelMapKey(price)]
 	matches := make(Matches)
+
 	if ok {
 		remove := make([]*Order, 0, 2)
+
 		for _, maker := range level.Orders.Iter() {
 			if taker.Quantity.LessThanOrEqual(maker.Quantity) {
 				// Given order (taker) is fully executed against an order
@@ -82,9 +86,11 @@ func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) (decimal.De
 				matches[maker.ID] = taker.Quantity
 				maker.Quantity = maker.Quantity.Sub(taker.Quantity)
 				taker.Quantity = decimal.Zero
+
 				if maker.Quantity.LessThanOrEqual(decimal.Zero) {
 					remove = append(remove, maker)
 				}
+
 				// fmt.Printf("[1] taker=%v maker=%v\n", taker, maker)
 				break
 			} else {
@@ -103,36 +109,48 @@ func (d *Ladder) MatchOrderLimit(price decimal.Decimal, taker Order) (decimal.De
 			d.RemoveOrder(price, order.ID)
 		}
 	}
+
 	return taker.Quantity, matches
 }
 
 func (d *Ladder) MatchOrderMarket(taker Order) (decimal.Decimal, Matches) {
 	matches := make(Matches)
+
 	// While there is still quantity to be matched and the ladder is not empty.
 	for taker.Quantity.IsPositive() && d.Heap.Len() > 0 {
 		price := d.Heap[0].Price
 		q, xs := d.MatchOrderLimit(price, taker)
 		taker.Quantity = q
+
 		for k, v := range xs {
 			matches[k] = v
 		}
 	}
+
 	return taker.Quantity, matches
 }
 
 func (d *Ladder) GetOrder(price decimal.Decimal, id string) (Order, bool) {
 	level, ok := d.Mapping[LevelMapKey(price)]
+
 	if ok {
 		return level.Orders.GetByID(id)
 	}
-	return Order{}, false
+
+	return Order{
+		ID:             id,
+		Quantity:       decimal.Zero,
+		InsertionIndex: 0,
+	}, false
 }
 
 func (d *Ladder) TotalQuantity(price decimal.Decimal) decimal.Decimal {
 	level, ok := d.Mapping[LevelMapKey(price)]
+
 	if ok {
 		return level.TotalQuantity()
 	}
+
 	return decimal.Zero
 }
 

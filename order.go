@@ -7,7 +7,8 @@ import (
 )
 
 type Order struct {
-	// TODO: Turn ID into int64.
+	//nolint:godox
+	//TODO: Turn ID into int64!
 	ID             string          // 16 bytes
 	Quantity       decimal.Decimal // 16 bytes
 	InsertionIndex int             //  8 bytes
@@ -15,8 +16,9 @@ type Order struct {
 
 func NewOrder(id string, quantity decimal.Decimal) Order {
 	return Order{
-		ID:       id,
-		Quantity: quantity,
+		ID:             id,
+		Quantity:       quantity,
+		InsertionIndex: 0,
 	}
 }
 

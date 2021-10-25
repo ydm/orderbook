@@ -30,6 +30,7 @@ func NewLevel(price decimal.Decimal, levelType int) *Level {
 		Price:  price,
 		Orders: NewOrderQueue(16),
 		Type:   levelType,
+		index:  0,
 	}
 }
 
@@ -50,18 +51,22 @@ func (v *Level) Less(rhs *Level) bool {
 
 func (v *Level) String() string {
 	t := "ask"
+
 	if v.Type == Bid {
 		t = "bid"
 	}
+
 	return fmt.Sprintf("  [Level Price=%v Orders(%d) Type=%s]\n%s",
 		v.Price, v.Orders.Len(), t, v.Orders.String())
 }
 
 func (v *Level) TotalQuantity() decimal.Decimal {
 	ans := decimal.Zero
+
 	for _, x := range v.Orders.Iter() {
 		ans = ans.Add(x.Quantity)
 	}
+
 	return ans
 }
 
@@ -76,6 +81,7 @@ type LevelHeap []*Level
 
 func NewLevelHeap(n int) LevelHeap {
 	xs := make([]*Level, 0, n)
+
 	return xs
 }
 
@@ -97,25 +103,36 @@ func (h LevelHeap) Walk(f func(level *Level) bool) {
 
 func (h LevelHeap) CountLevels() int {
 	ans := 0
+
 	h.Walk(func(level *Level) bool {
 		ans++
+
 		return true
 	})
+
 	return ans
 }
 
 func (h LevelHeap) String() string {
 	var b strings.Builder
+
 	fmt.Fprintf(&b, "[LevelHeap \n")
+
 	for _, x := range h {
 		fmt.Fprintf(&b, "%v\n", x)
 	}
+
 	fmt.Fprintf(&b, "]")
+
 	return b.String()
 }
 
 func (h *LevelHeap) Push(p interface{}) {
-	level := p.(*Level)
+	level, ok := p.(*Level)
+	if !ok {
+		panic("")
+	}
+
 	level.index = len(*h)
 	*h = append(*h, level)
 }
@@ -125,6 +142,7 @@ func (h *LevelHeap) Pop() interface{} {
 	level := (*h)[n-1]
 	level.index = -1
 	*h = (*h)[:n-1]
+
 	return level
 }
 

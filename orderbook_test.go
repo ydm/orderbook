@@ -70,6 +70,7 @@ func assertExecutedQuantities(t *testing.T, b *orderbook.Book, xs ...iq) {
 		if err != nil {
 			panic(err)
 		}
+
 		if !order.ExecutedQuantity.Equal(quantity) {
 			t.Errorf("order=%s: have executed quantity %v, want executed quantity %v",
 				order.ID, order.ExecutedQuantity, quantity)
@@ -100,7 +101,7 @@ func TestBook_AddOrder_1(t *testing.T) {
 
 	// Since the book is empty, the error returned should notify of incomplete
 	// execution.
-	if !errors.Is(err, orderbook.ErrMarketNotFullyExecuted) {
+	if !errors.Is(err, orderbook.ErrMarketOrderNotFullyExecuted) {
 		t.Error()
 	}
 
@@ -137,6 +138,7 @@ func TestBook_AddOrder_2(t *testing.T) {
 	if err := b.AddOrder(limit); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 1, 0)
 	assertLevels(t, &b.Asks, pq{"10000", "2"})
 
@@ -144,6 +146,7 @@ func TestBook_AddOrder_2(t *testing.T) {
 	if err := b.AddOrder(limit); !errors.Is(err, orderbook.ErrOrderExists) {
 		t.Error()
 	}
+
 	assertCountLevels(t, b, 1, 0)
 	assertLevels(t, &b.Asks, pq{"10000", "2"})
 
@@ -152,6 +155,7 @@ func TestBook_AddOrder_2(t *testing.T) {
 	if err := b.AddOrder(market); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 1, 0)
 	assertLevels(t, &b.Asks, pq{"10000", "1"})
 }
@@ -189,7 +193,7 @@ func TestBook_AddOrder_3(t *testing.T) {
 	assertCountLevels(t, b, 0, 0)
 
 	// Make sure the market order didn't execute fully.
-	if !errors.Is(err, orderbook.ErrMarketNotFullyExecuted) {
+	if !errors.Is(err, orderbook.ErrMarketOrderNotFullyExecuted) {
 		t.Error()
 	}
 
@@ -211,9 +215,11 @@ func TestBook_AddOrder_4(t *testing.T) {
 		ID:               "one",
 		Type:             orderbook.TypeLimit,
 	}
+
 	if err := b.AddOrder(sell); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 1, 0)
 
 	buy := orderbook.ClientOrder{
@@ -224,9 +230,11 @@ func TestBook_AddOrder_4(t *testing.T) {
 		ID:               "two",
 		Type:             orderbook.TypeLimit,
 	}
+
 	if err := b.AddOrder(buy); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 1, 1)
 	assertExecutedQuantities(t, b, iq{"one", "0"}, iq{"two", "0"})
 }
@@ -244,9 +252,11 @@ func TestBook_AddOrder_5(t *testing.T) {
 		ID:               "one",
 		Type:             orderbook.TypeLimit,
 	}
+
 	if err := b.AddOrder(sell); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 1, 0)
 	assertLevels(t, &b.Asks, pq{"10000", "1"})
 
@@ -258,9 +268,11 @@ func TestBook_AddOrder_5(t *testing.T) {
 		ID:               "two",
 		Type:             orderbook.TypeLimit,
 	}
+
 	if err := b.AddOrder(buy); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 0, 1)
 	assertLevels(t, &b.Bids, pq{"10000", "2"})
 
@@ -271,9 +283,11 @@ func TestBook_CancelOrder_1(t *testing.T) {
 	t.Parallel()
 
 	b := orderbook.NewBook()
+
 	if err := b.CancelOrder(""); !errors.Is(err, orderbook.ErrInvalidID) {
 		t.Error()
 	}
+
 	if err := b.CancelOrder("market"); !errors.Is(err, orderbook.ErrOrderDoesNotExist) {
 		t.Error()
 	}
@@ -286,9 +300,11 @@ func TestBook_CancelOrder_1(t *testing.T) {
 		ID:               "market",
 		Type:             orderbook.TypeMarket,
 	}
-	if err := b.AddOrder(market); !errors.Is(err, orderbook.ErrMarketNotFullyExecuted) {
+
+	if err := b.AddOrder(market); !errors.Is(err, orderbook.ErrMarketOrderNotFullyExecuted) {
 		t.Error()
 	}
+
 	if err := b.CancelOrder("market"); !errors.Is(err, orderbook.ErrCannotCancelMarketOrder) {
 		t.Error()
 	}
@@ -311,10 +327,13 @@ func TestBook_CancelOrder_2(t *testing.T) {
 	if err := b.AddOrder(limit); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 0, 1)
+
 	if err := b.CancelOrder("limit"); err != nil {
 		t.Error(err)
 	}
+
 	assertCountLevels(t, b, 0, 0)
 }
 
@@ -339,16 +358,19 @@ func TestBook_CancelOrder_3(t *testing.T) {
 		ID:               "market",
 		Type:             orderbook.TypeMarket,
 	}
+
 	if err := b.AddOrder(limit); err != nil {
 		t.Error(err)
 	}
 
 	assertCountLevels(t, b, 1, 0)
+
 	if err := b.AddOrder(market); err != nil {
 		t.Error(err)
 	}
 
 	assertCountLevels(t, b, 0, 0)
+
 	if err := b.CancelOrder("limit"); !errors.Is(err, orderbook.ErrCannotCancelOrder) {
 		t.Error(err)
 	}
@@ -370,9 +392,11 @@ func TestBook_GetSnapshot(t *testing.T) {
 				ID:               fmt.Sprintf("%d_%d", price, i),
 				Type:             orderbook.TypeLimit,
 			}
+
 			if price >= 21 {
 				order.Side = orderbook.SideSell
 			}
+
 			if err := b.AddOrder(order); err != nil {
 				t.Error(err)
 			}
@@ -398,9 +422,11 @@ func TestBook_GetSnapshot(t *testing.T) {
 
 	assertEq := func(level orderbook.ClientLevel, price int64) {
 		t.Helper()
+
 		if !level.Price.Equal(decimal.NewFromInt(price)) {
 			t.Errorf("have price %v, want price %d", level.Price, price)
 		}
+
 		if !level.Quantity.Equal(decimal.NewFromInt(2 * price * price)) {
 			t.Error()
 		}

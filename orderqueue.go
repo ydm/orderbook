@@ -3,25 +3,30 @@ package orderbook
 import (
 	"fmt"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 // BinarySearch returns index of the search key, if it is contained in
 // the array, otherwise (-(insertion point) – 1).
 func BinarySearch(xs []*Order, x int) int {
 	low, high := 0, len(xs)
+
 	for low < high {
 		mid := low + (high-low)/2
+
 		if xs[mid].InsertionIndex < x {
 			low = mid + 1
 		} else {
 			high = mid
 		}
 	}
+
 	if low < len(xs) && xs[low].InsertionIndex == x {
 		return low
-	} else {
-		return -low - 1
 	}
+
+	return -low - 1
 }
 
 // OrderQueue holds all the orders at a particular level of the order book.  It keeps them
@@ -42,12 +47,12 @@ func NewOrderQueue(n int) OrderQueue {
 	return OrderQueue{
 		queue:   make([]*Order, 0, n),
 		indices: make(map[string]int),
+		next:    0,
 	}
 }
 
 func (q *OrderQueue) Add(order Order) bool {
-	_, ok := q.indices[order.ID]
-	if ok {
+	if _, ok := q.indices[order.ID]; ok {
 		// There is already an order with this ID.
 		return false
 	}
@@ -80,6 +85,7 @@ func (q *OrderQueue) Remove() *Order {
 func (q *OrderQueue) RemoveByID(orderID string) bool {
 	// Check if we have an order with this ID.
 	insertionIndex, ok := q.indices[orderID]
+
 	if ok {
 		// If yes, locate its index in the queue.
 		i := BinarySearch(q.queue, insertionIndex)
@@ -92,22 +98,32 @@ func (q *OrderQueue) RemoveByID(orderID string) bool {
 
 			// Delete order from map.
 			delete(q.indices, order.ID)
+
 			return true
 		}
 	}
+
 	return false
 }
 
 func (q *OrderQueue) GetByID(orderID string) (Order, bool) {
 	insertionIndex, ok := q.indices[orderID]
+
 	if ok {
 		i := BinarySearch(q.queue, insertionIndex)
+
 		if i >= 0 {
 			order := q.queue[i]
+
 			return *order, true
 		}
 	}
-	return Order{}, false
+
+	return Order{
+		ID:             orderID,
+		Quantity:       decimal.Zero,
+		InsertionIndex: insertionIndex,
+	}, false
 }
 
 func (q *OrderQueue) Iter() []*Order {
@@ -121,16 +137,20 @@ func (q *OrderQueue) Len() int {
 		msg := fmt.Sprintf("invariant: len(queue)=%d len(indices)=%d\n", len(q.queue), len(q.indices))
 		panic(msg)
 	}
+
 	return len(q.queue)
 }
 
 func (q *OrderQueue) String() string {
 	var b strings.Builder
+
 	for i, order := range q.queue {
 		if i > 0 {
 			fmt.Fprintf(&b, "\n")
 		}
+
 		fmt.Fprintf(&b, "    %v", order)
 	}
+
 	return b.String()
 }

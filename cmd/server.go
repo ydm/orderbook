@@ -59,12 +59,14 @@ func addOrder(writer http.ResponseWriter, request *http.Request) {
 	body, err := ioutil.ReadAll(request.Body)
 	if err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
+
 		return
 	}
 
 	var order orderbook.ClientOrder
 	if err := json.Unmarshal(body, &order); err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
+
 		return
 	}
 
@@ -75,6 +77,7 @@ func addOrder(writer http.ResponseWriter, request *http.Request) {
 
 	if err := b.AddOrder(order); err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
+
 		return
 	}
 
@@ -82,6 +85,7 @@ func addOrder(writer http.ResponseWriter, request *http.Request) {
 	order, err = b.GetOrder(order.ID)
 	if err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
+
 		return
 	}
 

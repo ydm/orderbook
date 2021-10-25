@@ -10,17 +10,17 @@ import (
 )
 
 var (
-	ErrCannotCancelMarketOrder = errors.New("cannot cancel market order")
-	ErrCannotCancelOrder       = errors.New("given order is not eligible for cancelation")
-	ErrInvalidID               = errors.New("invalid order ID")
-	ErrInvalidPrice            = errors.New("invalid order price")
-	ErrInvalidQuantity         = errors.New("invalid order quantity")
-	ErrInvalidSide             = errors.New("invalid order side")
-	ErrInvalidType             = errors.New("invalid order type")
-	ErrMarketNotFullyExecuted  = errors.New("market order is not (fully) executed")
-	ErrMarketOrderHasPrice     = errors.New("given market order has price set")
-	ErrOrderDoesNotExist       = errors.New("order with this ID does not exist")
-	ErrOrderExists             = errors.New("order with this ID already exists")
+	ErrCannotCancelMarketOrder     = errors.New("cannot cancel market order")
+	ErrCannotCancelOrder           = errors.New("given order is not eligible for cancelation")
+	ErrInvalidID                   = errors.New("invalid order ID")
+	ErrInvalidPrice                = errors.New("invalid order price")
+	ErrInvalidQuantity             = errors.New("invalid order quantity")
+	ErrInvalidSide                 = errors.New("invalid order side")
+	ErrInvalidType                 = errors.New("invalid order type")
+	ErrMarketOrderNotFullyExecuted = errors.New("market order not (fully) executed")
+	ErrMarketOrderHasPrice         = errors.New("given market order has price set")
+	ErrOrderDoesNotExist           = errors.New("order with this ID does not exist")
+	ErrOrderExists                 = errors.New("order with this ID already exists")
 )
 
 type Book struct {
@@ -28,46 +28,49 @@ type Book struct {
 	Bids Ladder
 	mu   sync.Mutex
 
-	// Imagine this is a database.
-	//
-	// TODO: TURN THIS INTO sync.Map!
+	// Please, ser, imagine this is a database.
 	database      map[string]ClientOrder
 	databaseMutex sync.Mutex
 }
 
 func NewBook() *Book {
 	return &Book{
-		Asks:     NewLadder(Ask),
-		Bids:     NewLadder(Bid),
-		database: make(map[string]ClientOrder),
+		Asks:          NewLadder(Ask),
+		Bids:          NewLadder(Bid),
+		mu:            sync.Mutex{},
+		database:      make(map[string]ClientOrder),
+		databaseMutex: sync.Mutex{},
 	}
 }
 
-func (b *Book) AddOrder(order ClientOrder) error {
+func (b *Book) checkOrder(order ClientOrder) error {
 	// Check order properties.
 	if order.OriginalQuantity.LessThanOrEqual(decimal.Zero) {
 		return ErrInvalidQuantity
 	}
+
 	if !order.ExecutedQuantity.IsZero() {
 		return ErrInvalidQuantity
 	}
+
 	if order.ID == "" {
 		return ErrInvalidID
 	}
 
 	// Check if order with this ID already exists.
 	b.databaseMutex.Lock()
-	_, ok := b.database[order.ID]
+	_, ok := b.database[order.ID] //nolint:ifshort
 	b.databaseMutex.Unlock()
+
 	if ok {
 		return ErrOrderExists
 	}
 
-	// We'll be matching this order against the opposite ladder, i.e. if
-	// this is a buy order, we'll try to match it first against the asks.
-	// If it's also a limit order and left unmatched, it will be added.
-	var my, op *Ladder
-	switch order.Side {
+	return nil
+}
+
+func (b *Book) matchSides(side int) (my *Ladder, op *Ladder, err error) {
+	switch side {
 	case SideBuy:
 		my = &b.Bids
 		op = &b.Asks
@@ -75,12 +78,51 @@ func (b *Book) AddOrder(order ClientOrder) error {
 		my = &b.Asks
 		op = &b.Bids
 	default:
-		return ErrInvalidSide
+		err = ErrInvalidSide
+	}
+
+	return
+}
+
+func (b *Book) store(order ClientOrder, matches Matches) {
+	// Store new order.
+	b.databaseMutex.Lock()
+	b.database[order.ID] = order
+
+	// Update matched orders.
+	for id, x := range matches {
+		maker, ok := b.database[id]
+		if !ok {
+			panic("illegal state")
+		}
+
+		maker.ExecutedQuantity = maker.ExecutedQuantity.Add(x)
+		b.database[maker.ID] = maker
+	}
+
+	b.databaseMutex.Unlock()
+}
+
+//nolint:cyclop
+func (b *Book) AddOrder(order ClientOrder) error {
+	if err := b.checkOrder(order); err != nil {
+		return err
+	}
+
+	// We'll be matching this order against the opposite ladder, i.e. if
+	// this is a buy order, we'll try to match it first against the asks.
+	// If it's also a limit order and left unmatched, it will be added.
+	my, op, err := b.matchSides(order.Side)
+	if err != nil {
+		return err
 	}
 
 	x := NewOrder(order.ID, order.OriginalQuantity)
-	var left decimal.Decimal
-	var matches Matches
+
+	var (
+		left    decimal.Decimal
+		matches Matches
+	)
 
 	switch order.Type {
 	case TypeMarket:
@@ -94,45 +136,31 @@ func (b *Book) AddOrder(order ClientOrder) error {
 		b.mu.Lock()
 		left, matches = op.MatchOrderMarket(x)
 		b.mu.Unlock()
-
 	case TypeLimit:
 		if order.Price.IsNegative() {
 			return ErrInvalidPrice
 		}
 
 		// Limit orders may first be matched against the opposite side of the
-		// order book.  If the order remains unexecuted, it's placed in the order
-		// book.
+		// order book.  If the order remains not fully executed, it's placed in
+		// the order book.
 		b.mu.Lock()
 		left, matches = op.MatchOrderLimit(order.Price, x)
+
 		if left.IsPositive() {
 			my.AddOrder(order.Price, NewOrder(order.ID, left))
 		}
-		b.mu.Unlock()
 
+		b.mu.Unlock()
 	default:
 		return ErrInvalidType
 	}
 
 	order.ExecutedQuantity = order.OriginalQuantity.Sub(left)
-
-	// Store the new order to our database.
-	b.databaseMutex.Lock()
-	b.database[order.ID] = order
-
-	// Update matched orders in our database.
-	for id, x := range matches {
-		maker, ok := b.database[id]
-		if !ok {
-			panic("illegal state")
-		}
-		maker.ExecutedQuantity = maker.ExecutedQuantity.Add(x)
-		b.database[maker.ID] = maker
-	}
-	b.databaseMutex.Unlock()
+	b.store(order, matches)
 
 	if order.Type == TypeMarket && order.ExecutedQuantity.LessThan(order.OriginalQuantity) {
-		return ErrMarketNotFullyExecuted
+		return ErrMarketOrderNotFullyExecuted
 	}
 
 	return nil
@@ -147,6 +175,7 @@ func (b *Book) CancelOrder(id string) error {
 	b.databaseMutex.Lock()
 	order, ok := b.database[id]
 	b.databaseMutex.Unlock()
+
 	if !ok {
 		return ErrOrderDoesNotExist
 	}
@@ -163,12 +192,14 @@ func (b *Book) CancelOrder(id string) error {
 	case SideBuy:
 		b.mu.Lock()
 		defer b.mu.Unlock()
+
 		if b.Bids.RemoveOrder(order.Price, order.ID) {
 			return nil
 		}
 	case SideSell:
 		b.mu.Lock()
 		defer b.mu.Unlock()
+
 		if b.Asks.RemoveOrder(order.Price, order.ID) {
 			return nil
 		}
@@ -184,9 +215,11 @@ func (b *Book) GetOrder(id string) (ClientOrder, error) {
 	b.databaseMutex.Lock()
 	order, ok := b.database[id]
 	b.databaseMutex.Unlock()
+
 	if !ok {
 		return order, ErrOrderDoesNotExist
 	}
+
 	return order, nil
 }
 
@@ -207,6 +240,7 @@ func (b *Book) GetSnapshot(depth int) Snapshot {
 			Price:    level.Price,
 			Quantity: level.TotalQuantity(),
 		})
+
 		return true
 	}
 
@@ -221,6 +255,7 @@ func (b *Book) GetSnapshot(depth int) Snapshot {
 			Price:    level.Price,
 			Quantity: level.TotalQuantity(),
 		})
+
 		return true
 	}
 
@@ -228,5 +263,6 @@ func (b *Book) GetSnapshot(depth int) Snapshot {
 	b.Asks.Walk(ask)
 	b.Bids.Walk(bid)
 	b.mu.Unlock()
+
 	return ans
 }

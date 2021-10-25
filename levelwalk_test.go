@@ -28,6 +28,7 @@ func TestLevelHeap_Walk(t *testing.T) {
 				t.Errorf("have %v, want %s", level.Price, expected[index])
 			}
 			index++
+
 			return true
 		})
 	}

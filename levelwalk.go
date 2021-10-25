@@ -20,6 +20,7 @@ type PriorityQueue []Item
 
 func NewPriorityQueue(n int) PriorityQueue {
 	pq := make(PriorityQueue, 0, n)
+
 	return pq
 }
 
@@ -34,7 +35,11 @@ func (pq PriorityQueue) Swap(i, j int) {
 }
 
 func (pq *PriorityQueue) Push(x interface{}) {
-	item := x.(Item)
+	item, ok := x.(Item)
+	if !ok {
+		panic("")
+	}
+
 	*pq = append(*pq, item)
 }
 
@@ -43,6 +48,7 @@ func (pq *PriorityQueue) Pop() interface{} {
 	n := len(old)
 	item := old[n-1]
 	*pq = old[0 : n-1]
+
 	return item
 }
 
@@ -57,12 +63,16 @@ func Walk(h LevelHeap, f func(level *Level) bool) {
 			})
 		}
 	}
+
 	push(0)
+
 	for indices.Len() > 0 {
 		index := heap.Pop(&indices).(Item).index
+
 		if index >= len(h) {
 			continue
 		}
+
 		push(2*index + 1) // Left child.
 		push(2*index + 2) // Right child.
 
