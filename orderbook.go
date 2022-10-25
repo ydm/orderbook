@@ -28,7 +28,7 @@ type Book struct {
 	Bids Ladder
 	mu   sync.Mutex
 
-	// Please, ser, imagine this is a database.
+	// Ser, please imagine this is a database.
 	database      map[string]ClientOrder
 	databaseMutex sync.Mutex
 }
