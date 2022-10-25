@@ -69,19 +69,15 @@ func (b *Book) checkOrder(order ClientOrder) error {
 	return nil
 }
 
-func (b *Book) matchSides(side int) (my *Ladder, op *Ladder, err error) {
+func (b *Book) matchSides(side int) (*Ladder, *Ladder, error) {
 	switch side {
 	case SideBuy:
-		my = &b.Bids
-		op = &b.Asks
+		return &b.Bids, &b.Asks, nil
 	case SideSell:
-		my = &b.Asks
-		op = &b.Bids
+		return &b.Asks, &b.Bids, nil
 	default:
-		err = ErrInvalidSide
+		return nil, nil, ErrInvalidSide
 	}
-
-	return
 }
 
 func (b *Book) store(order ClientOrder, matches Matches) {

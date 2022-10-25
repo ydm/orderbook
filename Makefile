@@ -1,35 +1,37 @@
+.PHONY: help
 help:
 	@echo 'Management commands:'
 	@echo
 	@echo 'Usage:'
-	@echo '    make help            Print this.'
-	@echo '    make all             Make lint -> orderbook -> server.'
+	@echo '    make help            Print this help message.'
+	@echo '    make all             Lint and build.'
 	@echo '    make clean           Clean directory tree.'
 	@echo '    make fix             Fix small linting problems.'
 	@echo '    make lint            Run static analysis on source code.'
-	@echo '    make orderbook       Compile project.'
-	@echo '    make server          Compile server executable.'
+	@echo '    make build           Compile project.'
 	@echo '    make test            Run tests.'
 	@echo
 
-all: lint orderbook server
+.PHONY: all
+all: clean lint build
 
+.PHONY: clean
 clean:
 	rm -f server
 
+.PHONY: fix
 fix:
 	golangci-lint run --fix
 
+.PHONY: lint
 lint:
 	golangci-lint run
 
-orderbook:
+.PHONY: build
+build:
 	go build
-
-server: clean
 	go build cmd/server.go
 
+.PHONY: test
 test:
 	go test .
-
-.PHONY: all clean help lint orderbok server test

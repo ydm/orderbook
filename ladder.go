@@ -18,24 +18,26 @@ type Ladder struct {
 }
 
 func NewLadder(ladderType int) Ladder {
+	const heapSize = 256
+
 	return Ladder{
-		Heap:    make(LevelHeap, 0, 256),
+		Heap:    make(LevelHeap, 0, heapSize),
 		Mapping: make(LevelMap),
 		Type:    ladderType,
 	}
 }
 
-func (d *Ladder) AddOrder(price decimal.Decimal, o Order) bool {
+func (d *Ladder) AddOrder(price decimal.Decimal, order Order) bool {
 	// First check if this level exists.
 	level, ok := d.Mapping[LevelMapKey(price)]
 	if ok {
 		// Add the order to this existing level.
-		return level.Orders.Add(o)
+		return level.Orders.Add(order)
 	}
 
 	// Level does not exist.  Create it and add the order.
 	level = NewLevel(price, d.Type)
-	if !level.Orders.Add(o) {
+	if !level.Orders.Add(order) {
 		panic("illegal state")
 	}
 
@@ -130,15 +132,15 @@ func (d *Ladder) MatchOrderMarket(taker Order) (decimal.Decimal, Matches) {
 	return taker.Quantity, matches
 }
 
-func (d *Ladder) GetOrder(price decimal.Decimal, id string) (Order, bool) {
+func (d *Ladder) GetOrder(price decimal.Decimal, orderID string) (Order, bool) {
 	level, ok := d.Mapping[LevelMapKey(price)]
 
 	if ok {
-		return level.Orders.GetByID(id)
+		return level.Orders.GetByID(orderID)
 	}
 
 	return Order{
-		ID:             id,
+		ID:             orderID,
 		Quantity:       decimal.Zero,
 		InsertionIndex: 0,
 	}, false

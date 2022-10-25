@@ -53,13 +53,18 @@ func (pq *PriorityQueue) Pop() interface{} {
 }
 
 // Walk in order over Levels in a LevelHeap.
-func Walk(h LevelHeap, f func(level *Level) bool) {
-	indices := NewPriorityQueue(h.Len()/2 + 1)
+func Walk(levels LevelHeap, each func(level *Level) bool) {
+	const (
+		left  = 1
+		right = 2
+	)
+
+	indices := NewPriorityQueue(levels.Len()/2 + 1)
 	push := func(i int) {
-		if i < h.Len() {
+		if i < levels.Len() {
 			heap.Push(&indices, Item{
 				index:    i,
-				priority: h[i].Key(),
+				priority: levels[i].Key(),
 			})
 		}
 	}
@@ -67,16 +72,22 @@ func Walk(h LevelHeap, f func(level *Level) bool) {
 	push(0)
 
 	for indices.Len() > 0 {
-		index := heap.Pop(&indices).(Item).index
+		item, ok := heap.Pop(&indices).(Item)
 
-		if index >= len(h) {
+		if !ok {
 			continue
 		}
 
-		push(2*index + 1) // Left child.
-		push(2*index + 2) // Right child.
+		index := item.index
 
-		if !f(h[index]) {
+		if index >= len(levels) {
+			continue
+		}
+
+		push(2*index + left)  // Left child.
+		push(2*index + right) // Right child.
+
+		if !each(levels[index]) {
 			break
 		}
 	}

@@ -1,8 +1,15 @@
 linters:
   enable-all: true
   disable:
-    - golint                    # deprecated
-    - interfacer                # deprecated
-    - scopelint                 # deprecated
-    - maligned                  # deprecated
-    - gomnd                     # damn annoying
+    - deadcode
+    - exhaustivestruct
+    - golint
+    - ifshort
+    - interfacer
+    - maligned
+    - nosnakecase
+    - scopelint
+    - structcheck
+    - varcheck
+    - varnamelen # fu
+    - gomnd      # fu too

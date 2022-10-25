@@ -26,9 +26,11 @@ type Level struct {
 }
 
 func NewLevel(price decimal.Decimal, levelType int) *Level {
+	const queueSize = 16
+
 	return &Level{
 		Price:  price,
-		Orders: NewOrderQueue(16),
+		Orders: NewOrderQueue(queueSize),
 		Type:   levelType,
 		index:  0,
 	}
@@ -50,14 +52,14 @@ func (v *Level) Less(rhs *Level) bool {
 }
 
 func (v *Level) String() string {
-	t := "ask"
+	side := "ask"
 
 	if v.Type == Bid {
-		t = "bid"
+		side = "bid"
 	}
 
 	return fmt.Sprintf("  [Level Price=%v Orders(%d) Type=%s]\n%s",
-		v.Price, v.Orders.Len(), t, v.Orders.String())
+		v.Price, v.Orders.Len(), side, v.Orders.String())
 }
 
 func (v *Level) TotalQuantity() decimal.Decimal {
@@ -114,17 +116,17 @@ func (h LevelHeap) CountLevels() int {
 }
 
 func (h LevelHeap) String() string {
-	var b strings.Builder
+	var out strings.Builder
 
-	fmt.Fprintf(&b, "[LevelHeap \n")
+	fmt.Fprintf(&out, "[LevelHeap \n")
 
 	for _, x := range h {
-		fmt.Fprintf(&b, "%v\n", x)
+		fmt.Fprintf(&out, "%v\n", x)
 	}
 
-	fmt.Fprintf(&b, "]")
+	fmt.Fprintf(&out, "]")
 
-	return b.String()
+	return out.String()
 }
 
 func (h *LevelHeap) Push(p interface{}) {
@@ -154,5 +156,7 @@ func (h *LevelHeap) Pop() interface{} {
 type LevelMap map[int64]*Level
 
 func LevelMapKey(d decimal.Decimal) int64 {
-	return d.Mul(decimal.NewFromInt(1_0000_0000)).IntPart()
+	const K = 1_0000_0000
+
+	return d.Mul(decimal.NewFromInt(K)).IntPart()
 }

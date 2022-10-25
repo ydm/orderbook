@@ -11,17 +11,17 @@ import (
 func TestLevelHeap_Walk(t *testing.T) {
 	t.Parallel()
 
-	f := func(levelType int, expected []string) {
-		xs := orderbook.NewLevelHeap(16)
-		heap.Push(&xs, orderbook.NewLevel(decimal.NewFromInt(4), levelType))
-		heap.Push(&xs, orderbook.NewLevel(decimal.NewFromInt(2), levelType))
-		heap.Push(&xs, orderbook.NewLevel(decimal.NewFromInt(5), levelType))
-		heap.Push(&xs, orderbook.NewLevel(decimal.NewFromInt(1), levelType))
-		heap.Push(&xs, orderbook.NewLevel(decimal.NewFromInt(3), levelType))
+	check := func(levelType int, expected []string) {
+		levels := orderbook.NewLevelHeap(16)
+		heap.Push(&levels, orderbook.NewLevel(decimal.NewFromInt(4), levelType))
+		heap.Push(&levels, orderbook.NewLevel(decimal.NewFromInt(2), levelType))
+		heap.Push(&levels, orderbook.NewLevel(decimal.NewFromInt(5), levelType))
+		heap.Push(&levels, orderbook.NewLevel(decimal.NewFromInt(1), levelType))
+		heap.Push(&levels, orderbook.NewLevel(decimal.NewFromInt(3), levelType))
 
 		index := 0
 
-		xs.Walk(func(level *orderbook.Level) bool {
+		levels.Walk(func(level *orderbook.Level) bool {
 			t.Helper()
 
 			if level.Price.String() != expected[index] {
@@ -33,6 +33,6 @@ func TestLevelHeap_Walk(t *testing.T) {
 		})
 	}
 
-	f(orderbook.Ask, []string{"1", "2", "3", "4", "5"})
-	f(orderbook.Bid, []string{"5", "4", "3", "2", "1"})
+	check(orderbook.Ask, []string{"1", "2", "3", "4", "5"})
+	check(orderbook.Bid, []string{"5", "4", "3", "2", "1"})
 }

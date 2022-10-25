@@ -9,46 +9,49 @@ import (
 	"github.com/ydm/orderbook"
 )
 
-func assertCountLevels(t *testing.T, b *orderbook.Book, asks, bids int) {
+func assertCountLevels(t *testing.T, book *orderbook.Book, asks, bids int) {
 	t.Helper()
 
-	if have := b.Asks.Heap.CountLevels(); have != asks {
+	if have := book.Asks.Heap.CountLevels(); have != asks {
 		t.Errorf("have %d, want %d", have, asks)
 	}
 
-	if have := b.Bids.Heap.CountLevels(); have != bids {
+	if have := book.Bids.Heap.CountLevels(); have != bids {
 		t.Errorf("have %d, want %d", have, bids)
 	}
 }
 
 type pq struct{ price, quantity string }
 
-func assertLevels(t *testing.T, ladder *orderbook.Ladder, xs ...pq) {
+func assertLevels(t *testing.T, ladder *orderbook.Ladder, expected ...pq) {
 	t.Helper()
 
 	ladder.Walk(func(level *orderbook.Level) bool {
 		t.Helper()
 
-		if len(xs) == 0 {
+		if len(expected) == 0 {
 			t.Errorf("unexpected level at price %v", level.Price)
 		}
-		x := xs[0]
-		xs = xs[1:]
 
-		price, err := decimal.NewFromString(x.price)
-		if err != nil {
-			panic(err)
-		}
-		quantity, err := decimal.NewFromString(x.quantity)
+		want := expected[0]
+		expected = expected[1:]
+
+		wantPrice, err := decimal.NewFromString(want.price)
 		if err != nil {
 			panic(err)
 		}
 
-		if !level.Price.Equal(price) {
-			t.Errorf("have %v, want %v", level.Price, price)
+		wantQuantity, err := decimal.NewFromString(want.quantity)
+		if err != nil {
+			panic(err)
 		}
-		if have := level.TotalQuantity(); !have.Equal(quantity) {
-			t.Errorf("have %v, want %v", have, quantity)
+
+		if havePrice := level.Price; !havePrice.Equal(wantPrice) {
+			t.Errorf("have %v, want %v", havePrice, wantPrice)
+		}
+
+		if haveQuantity := level.TotalQuantity(); !haveQuantity.Equal(wantQuantity) {
+			t.Errorf("have %v, want %v", haveQuantity, wantQuantity)
 		}
 
 		return true

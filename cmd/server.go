@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -41,13 +41,13 @@ func logf(format string, a ...interface{}) {
 	fmt.Printf(format, a...)
 }
 
-func respond(w http.ResponseWriter, r Response) {
-	encoded, err := json.Marshal(r)
+func respond(writer http.ResponseWriter, response Response) {
+	encoded, err := json.Marshal(response)
 	if err != nil {
 		logf("WRN: Error while encoding response: %v\n", err)
-		w.WriteHeader(500)
+		writer.WriteHeader(http.StatusInternalServerError)
 	} else {
-		fmt.Fprint(w, string(encoded))
+		fmt.Fprint(writer, string(encoded))
 	}
 }
 
@@ -56,7 +56,7 @@ func respond(w http.ResponseWriter, r Response) {
 // +------------------+
 
 func addOrder(writer http.ResponseWriter, request *http.Request) {
-	body, err := ioutil.ReadAll(request.Body)
+	body, err := io.ReadAll(request.Body)
 	if err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
 
@@ -70,19 +70,19 @@ func addOrder(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
+	book, ok := request.Context().Value(BookKey).(*orderbook.Book)
 	if !ok {
 		panic("")
 	}
 
-	if err := b.AddOrder(order); err != nil {
+	if err := book.AddOrder(order); err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
 
 		return
 	}
 
 	// Return order's current status.
-	order, err = b.GetOrder(order.ID)
+	order, err = book.GetOrder(order.ID)
 	if err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
 
@@ -98,14 +98,14 @@ func addOrder(writer http.ResponseWriter, request *http.Request) {
 
 func cancelOrder(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
-	id := vars["id"]
+	orderID := vars["id"]
 
 	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
 	if !ok {
 		panic("")
 	}
 
-	if err := b.CancelOrder(id); err == nil {
+	if err := b.CancelOrder(orderID); err == nil {
 		respond(writer, Response{Response: true, Error: ""})
 	} else {
 		respond(writer, Response{Response: false, Error: err.Error()})
@@ -118,14 +118,14 @@ func cancelOrder(writer http.ResponseWriter, request *http.Request) {
 
 func queryOrder(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
-	id := vars["id"]
+	orderID := vars["id"]
 
 	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
 	if !ok {
 		panic("")
 	}
 
-	if order, err := b.GetOrder(id); err != nil {
+	if order, err := b.GetOrder(orderID); err != nil {
 		respond(writer, Response{Response: nil, Error: err.Error()})
 	} else {
 		respond(writer, Response{Response: order, Error: ""})
@@ -143,8 +143,8 @@ type bookResponse struct {
 }
 
 func book(writer http.ResponseWriter, request *http.Request) {
-	depths, ok := request.URL.Query()["depth"]
-	if !ok {
+	depths, depthsOK := request.URL.Query()["depth"]
+	if !depthsOK {
 		depths = []string{"20"}
 	}
 
@@ -153,12 +153,12 @@ func book(writer http.ResponseWriter, request *http.Request) {
 		depth = 20
 	}
 
-	b, ok := request.Context().Value(BookKey).(*orderbook.Book)
-	if !ok {
+	book, bookOK := request.Context().Value(BookKey).(*orderbook.Book)
+	if !bookOK {
 		panic("")
 	}
 
-	snapshot := b.GetSnapshot(depth)
+	snapshot := book.GetSnapshot(depth)
 
 	respond(writer, Response{
 		Response: bookResponse{
@@ -185,17 +185,17 @@ func main() {
 	router.HandleFunc("/orders/{id}", cancelOrder).Methods("DELETE")
 	router.HandleFunc("/book/", book).Methods("GET")
 
-	b := orderbook.NewBook()
-	f := func(next http.Handler) http.Handler {
+	book := orderbook.NewBook()
+	handler := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), BookKey, b)
+			ctx := context.WithValue(r.Context(), BookKey, book)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 
 	var server http.Server
 	server.Addr = ":7701"
-	server.Handler = f(router)
+	server.Handler = handler(router)
 
 	go func() {
 		logf("INF: Starting server at port 7701...\n")
