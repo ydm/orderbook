@@ -3,11 +3,16 @@ package orderbook_test
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/shopspring/decimal"
 	"github.com/ydm/orderbook"
 )
+
+type iq struct{ id, quantity string }
+
+type pq struct{ price, quantity string }
 
 func assertCountLevels(t *testing.T, book *orderbook.Book, asks, bids int) {
 	t.Helper()
@@ -20,8 +25,6 @@ func assertCountLevels(t *testing.T, book *orderbook.Book, asks, bids int) {
 		t.Errorf("have %d, want %d", have, bids)
 	}
 }
-
-type pq struct{ price, quantity string }
 
 func assertLevels(t *testing.T, ladder *orderbook.Ladder, expected ...pq) {
 	t.Helper()
@@ -58,12 +61,10 @@ func assertLevels(t *testing.T, ladder *orderbook.Ladder, expected ...pq) {
 	})
 }
 
-type iq struct{ id, quantity string }
-
-func assertExecutedQuantities(t *testing.T, b *orderbook.Book, xs ...iq) {
+func assertExecutedQuantities(t *testing.T, b *orderbook.Book, expected ...iq) {
 	t.Helper()
 
-	for _, x := range xs {
+	for _, x := range expected {
 		order, err := b.GetOrder(x.id)
 		if err != nil {
 			t.Error(err)
@@ -75,7 +76,7 @@ func assertExecutedQuantities(t *testing.T, b *orderbook.Book, xs ...iq) {
 		}
 
 		if !order.ExecutedQuantity.Equal(quantity) {
-			t.Errorf("order=%s: have executed quantity %v, want executed quantity %v",
+			t.Errorf("order %s: have executed quantity %v, want executed quantity %v",
 				order.ID, order.ExecutedQuantity, quantity)
 		}
 	}
@@ -205,7 +206,8 @@ func TestBook_AddOrder_3(t *testing.T) {
 	assertExecutedQuantities(t, b, iq{"market", "1"})
 }
 
-// Add two limit orders that do not touch each other's prices.
+// Add two opposing limit orders that do not touch each other's
+// prices.  We expect no execution.
 func TestBook_AddOrder_4(t *testing.T) {
 	t.Parallel()
 
@@ -280,6 +282,144 @@ func TestBook_AddOrder_5(t *testing.T) {
 	assertLevels(t, &b.Bids, pq{"10000", "2"})
 
 	assertExecutedQuantities(t, b, iq{"one", "1"}, iq{"two", "1"})
+}
+
+// Cascading filling of a matching order.
+//
+// Let's say we have three bid levels:
+// - price=100, quantity=3
+// - price= 99, quantity=2
+// - price= 98, quantity=1
+//
+// We have four subtests where we submit a market sell order with
+// quantity of 2, 4, 6 and 8 respectively.
+//
+// We expect to sell at level 100 first, then 99, then 98.
+//
+//nolint:cyclop,funlen
+func TestBook_AddOrder_6(t *testing.T) {
+	t.Parallel()
+
+	setup := func() *orderbook.Book {
+		t.Helper()
+
+		book := orderbook.NewBook()
+
+		orders := []pq{
+			{"99", "3"},
+			{"98", "2"},
+			{"97", "1"},
+		}
+
+		for _, order := range orders {
+			quantity, quantityErr := decimal.NewFromString(order.quantity)
+			if quantityErr != nil {
+				t.Error(quantityErr)
+			}
+
+			price, priceErr := decimal.NewFromString(order.price)
+			if priceErr != nil {
+				t.Error(priceErr)
+			}
+
+			if err := book.AddOrder(orderbook.ClientOrder{
+				Side:             orderbook.SideBuy,
+				OriginalQuantity: quantity,
+				ExecutedQuantity: decimal.Zero,
+				Price:            price,
+				ID:               fmt.Sprintf("buy%s", order.price),
+				Type:             orderbook.TypeLimit,
+			}); err != nil {
+				t.Error(err)
+			}
+		}
+
+		assertCountLevels(t, book, 0, 3)
+		assertLevels(t, &book.Asks,
+			pq{"99", "3"},
+			pq{"98", "2"},
+			pq{"97", "1"},
+		)
+		assertExecutedQuantities(t, book,
+			iq{"buy99", "0"},
+			iq{"buy98", "0"},
+			iq{"buy97", "0"},
+		)
+
+		return book
+	}
+
+	check := func(
+		quantity int64,
+		expectedExecutedQuantity int64,
+		expectedLevel99,
+		expectedLevel98,
+		expectedLevel97,
+		expectedQuantity99,
+		expectedQuantity98,
+		expectedQuantity97 int,
+	) {
+		book := setup()
+		submissionError := book.AddOrder(orderbook.ClientOrder{
+			Side:             orderbook.SideSell,
+			OriginalQuantity: decimal.NewFromInt(quantity),
+			ExecutedQuantity: decimal.Zero,
+			Price:            decimal.Zero,
+			ID:               "sell",
+			Type:             orderbook.TypeMarket,
+		})
+
+		if expectedExecutedQuantity == quantity {
+			order, err := book.GetOrder("sell")
+			if err != nil {
+				t.Error(err)
+			}
+
+			if !decimal.NewFromInt(expectedExecutedQuantity).Equal(order.ExecutedQuantity) {
+				t.Errorf("want %d, have %v", expectedExecutedQuantity, order.ExecutedQuantity)
+			}
+		} else if !errors.Is(submissionError, orderbook.ErrMarketOrderNotFullyExecuted) {
+			t.Errorf("want ErrMarketOrderNotFullyExecuted, have %v", submissionError)
+		}
+
+		expectedLevels := 0
+
+		if expectedLevel99 > 0 {
+			expectedLevels++
+		}
+
+		if expectedLevel98 > 0 {
+			expectedLevels++
+		}
+
+		if expectedLevel97 > 0 {
+			expectedLevels++
+		}
+
+		assertCountLevels(t, book, 0, expectedLevels)
+		assertLevels(t, &book.Asks,
+			pq{"99", strconv.Itoa(expectedLevel99)},
+			pq{"98", strconv.Itoa(expectedLevel98)},
+			pq{"97", strconv.Itoa(expectedLevel97)},
+		)
+		assertExecutedQuantities(t, book,
+			iq{"buy99", strconv.Itoa(expectedQuantity99)},
+			iq{"buy98", strconv.Itoa(expectedQuantity98)},
+			iq{"buy97", strconv.Itoa(expectedQuantity97)},
+		)
+	}
+
+	// Submit a sell order with quantity of 2.
+	check(2, 2, 1, 2, 1, 2, 0, 0)
+
+	// Submit a sell order with quantity of 4.
+	check(4, 4, 0, 1, 1, 3, 1, 0)
+
+	// Submit a sell order with quantity of 6.
+	check(6, 6, 0, 0, 0, 3, 2, 1)
+
+	// Submit a sell order with quantity of 8.
+	check(8, 6, 0, 0, 0, 3, 2, 1)
 }
 
 func TestBook_CancelOrder_1(t *testing.T) {
